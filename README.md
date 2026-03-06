@@ -8,25 +8,29 @@ This repository will gradually expand to include other **math puzzles, logic gam
 
 ## Current Games
 
-To access the game 24 point please click here -> https://growingrui.github.io/brainstorming/24-point-game
+Please click the link below to access the games:
 
-To access the game sudoku please click here -> https://growingrui.github.io/brainstorming/sudoku-game
+24 point -> https://growingrui.github.io/brainstorming/24-point-game
 
-To access the game Five in a Row please click here -> https://growingrui.github.io/brainstorming/Five-in-a-Row
+sudoku -> https://growingrui.github.io/brainstorming/sudoku-game
 
-To access the weather app What2wear please click here -> https://growingrui.github.io/brainstorming/What2Wear
+Five in a Row -> https://growingrui.github.io/brainstorming/Five-in-a-Row
+
+What2wear -> https://growingrui.github.io/brainstorming/What2Wear
 
 Please note: 📍 Location services need to be enabled for the app What2wear to function properly.
 
-To access the game Spaceship please click here -> https://growingrui.github.io/brainstorming/Spaceship-adventure
+Spaceship -> https://growingrui.github.io/brainstorming/Spaceship-adventure
 
-To access the game CyberRun please click here -> 
+CyberRun -> Currently unavailable
 
-To access the game Memory-Match-Challenge please click here -> https://growingrui.github.io/brainstorming/Memory-Match-Challenge
+Memory-Match-Challenge -> https://growingrui.github.io/brainstorming/Memory-Match-Challenge
 
-To access the game Maze please click here -> https://growingrui.github.io/brainstorming/Shadow-Maze
+Maze -> https://growingrui.github.io/brainstorming/Shadow-Maze
 
-To access the game Move box please click here -> https://growingrui.github.io/brainstorming/Sokoban
+Move box -> https://growingrui.github.io/brainstorming/Sokoban
+
+Snake -> https://growingrui.github.io/brainstorming/snake
 
 
 
