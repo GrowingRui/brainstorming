@@ -1,10 +1,10 @@
-# Puzzle Games Collection 🎮🧩
+# Mini Games Collection 🎮
 
-Welcome to this collection of engaging online puzzle games, designed to challenge your **mathematical skills, logic, and creativity**!  
+Welcome to this collection of **fun and engaging online mini games**!
 
-The first game in this collection is **24 Game**, a thrilling challenge where you use four numbers to create an expression that equals 24, employing basic arithmetic operations—addition, subtraction, multiplication, and division.
+This repository contains a **variety of mini games** built for fun, experimentation, and creativity. The games include different genres such as puzzles, arcade games, logic challenges, and other casual games.
 
-This repository will gradually expand to include other **math puzzles, logic games, and brain teasers**. Stay tuned for more exciting games like Sudoku, KenKen, and other number or logic challenges!
+New games will be added over time as the project continues to grow.
 
 ## Current Games
 
@@ -36,5 +36,5 @@ Snake -> https://growingrui.github.io/brainstorming/snake
 
 ## About
 
-This project is intended for anyone who enjoys **brain-training, fun math challenges, and logic puzzles**. New games will be added regularly, making this repository a growing hub for little games.
+This project is for anyone who enjoys simple and fun mini games. More games will be added in the future!
 
