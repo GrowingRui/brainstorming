@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Snake - Large Map Edition</title>
+    <title>Neon Snake - Obstacles Edition</title>
     <style>
         :root {
             --bg-color: #0d1117;
             --snake-head: #00ff88;
             --snake-body: #00bd68;
             --food-color: #ff4d4d;
+            --rock-color: #808080; /* 石头颜色 */
             --text-color: #ffffff;
         }
 
@@ -31,7 +32,7 @@
             display: flex;
             justify-content: space-between;
             width: 95vw;
-            max-width: 600px; /* Increased width for stats */
+            max-width: 600px;
             color: var(--text-color);
             margin-bottom: 10px;
             font-size: 1.1rem;
@@ -41,7 +42,7 @@
         #game-container {
             position: relative;
             width: 95vw;
-            max-width: 600px; /* Increased map size for desktop */
+            max-width: 600px;
             aspect-ratio: 1 / 1;
             border: 3px solid #30363d;
             border-radius: 8px;
@@ -112,7 +113,7 @@
     <div id="game-container">
         <canvas id="snakeGame"></canvas>
         <div id="overlay">
-            <h2 id="msg">LARGE MAP MODE</h2>
+            <h2 id="msg">OBSTACLE MODE</h2>
             <button class="btn-start" onclick="startGame()">START</button>
         </div>
     </div>
@@ -125,7 +126,6 @@
     </div>
 
     <script>
-        // Service Worker Logic Placeholder
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js').catch(() => {});
@@ -139,8 +139,7 @@
         const overlay = document.getElementById("overlay");
         const msgText = document.getElementById("msg");
 
-        // MAP ADJUSTMENTS
-        const gridSize = 15; // Smaller grid units = more tiles on screen
+        const gridSize = 15; 
         let tileCount;
         let score = 0;
         let highScore = localStorage.getItem("snakeHigh") || 0;
@@ -148,6 +147,9 @@
 
         let snake = [];
         let food = {x: 5, y: 5};
+        let obstacles = []; // 存储石头的阵列
+        const obstacleCount = 8; // 设置地图上石头的数量
+
         let dx = 0; let dy = 0;
         let nextDx = 0; let nextDy = 0;
         let isRunning = false;
@@ -157,7 +159,6 @@
             const size = container.clientWidth;
             canvas.width = size;
             canvas.height = size;
-            // Recalculate how many tiles fit in the new size
             tileCount = Math.floor(canvas.width / gridSize);
         }
 
@@ -180,6 +181,7 @@
 
             setTimeout(() => {
                 clearCanvas();
+                drawObstacles(); // 绘制石头
                 drawFood();
                 advanceSnake();
                 drawSnake();
@@ -191,7 +193,6 @@
             ctx.fillStyle = "#161b22";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            // Optional: Draw subtle grid lines
             ctx.strokeStyle = "rgba(255, 255, 255, 0.03)";
             for(let i=0; i<canvas.width; i+=gridSize) {
                 ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke();
@@ -203,6 +204,16 @@
             snake.forEach((part, index) => {
                 ctx.fillStyle = (index === 0) ? "#00ff88" : "#00bd68";
                 ctx.fillRect(part.x * gridSize, part.y * gridSize, gridSize - 1, gridSize - 1);
+            });
+        }
+
+        function drawObstacles() {
+            ctx.fillStyle = "#808080";
+            obstacles.forEach(rock => {
+                // 绘制带有一点圆角的石头
+                ctx.beginPath();
+                ctx.roundRect(rock.x * gridSize, rock.y * gridSize, gridSize - 1, gridSize - 1, 4);
+                ctx.fill();
             });
         }
 
@@ -224,9 +235,20 @@
 
         function didGameEnd() {
             if (dx === 0 && dy === 0) return false;
-            if (snake[0].x < 0 || snake[0].x >= tileCount || snake[0].y < 0 || snake[0].y >= tileCount) return true;
+            
+            const head = snake[0];
+
+            // 撞墙检测
+            if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) return true;
+            
+            // 撞石头检测
+            for (let rock of obstacles) {
+                if (head.x === rock.x && head.y === rock.y) return true;
+            }
+
+            // 撞自己检测
             for (let i = 4; i < snake.length; i++) {
-                if (snake[i].x === snake[0].x && snake[i].y === snake[0].y) return true;
+                if (snake[i].x === head.x && snake[i].y === head.y) return true;
             }
             return false;
         }
@@ -238,13 +260,34 @@
                 localStorage.setItem("snakeHigh", highScore);
                 highscoreElement.innerText = highScore;
             }
-            msgText.innerText = "GAME OVER";
+            msgText.innerText = "CRASHED!";
             overlay.style.display = "flex";
         }
 
         function createFood() {
             food.x = Math.floor(Math.random() * tileCount);
             food.y = Math.floor(Math.random() * tileCount);
+            
+            // 确保食物不生成在石头或蛇身上
+            const onObstacle = obstacles.some(r => r.x === food.x && r.y === food.y);
+            const onSnake = snake.some(s => s.x === food.x && s.y === food.y);
+            if(onObstacle || onSnake) createFood();
+        }
+
+        function createObstacles() {
+            obstacles = [];
+            for(let i=0; i < obstacleCount; i++) {
+                let rx = Math.floor(Math.random() * tileCount);
+                let ry = Math.floor(Math.random() * tileCount);
+                
+                // 确保石头不生成在蛇初始位置周围
+                const isNearStart = Math.abs(rx - Math.floor(tileCount/2)) < 5;
+                if(!isNearStart) {
+                    obstacles.push({x: rx, y: ry});
+                } else {
+                    i--; // 重新尝试
+                }
+            }
         }
 
         function drawFood() {
@@ -267,12 +310,12 @@
         });
 
         function resetGame() {
-            // Start in the middle of the larger map
             const middle = Math.floor(tileCount / 2);
             snake = [{x: middle, y: middle}, {x: middle, y: middle+1}, {x: middle, y: middle+2}];
             score = 0;
             scoreElement.innerText = score;
             dx = 0; dy = 0; nextDx = 0; nextDy = 0;
+            createObstacles(); // 每次开始重新生成石头
             createFood();
         }
     </script>
