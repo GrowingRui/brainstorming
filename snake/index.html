@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Snake - Mobile & Desktop</title>
+    <title>Neon Snake - Large Map Edition</title>
     <style>
         :root {
             --bg-color: #0d1117;
             --snake-head: #00ff88;
             --snake-body: #00bd68;
             --food-color: #ff4d4d;
-            --accent: #58a6ff;
             --text-color: #ffffff;
         }
 
@@ -23,32 +22,29 @@
             justify-content: center;
             height: 100vh;
             background-color: var(--bg-color);
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'Segoe UI', sans-serif;
             overflow: hidden;
-            touch-action: none; /* Crucial for mobile: prevents screen bouncing */
+            touch-action: none;
         }
 
-        /* Stats Bar */
         .stats {
             display: flex;
             justify-content: space-between;
-            width: 90vw;
-            max-width: 400px;
+            width: 95vw;
+            max-width: 600px; /* Increased width for stats */
             color: var(--text-color);
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             font-size: 1.1rem;
-            letter-spacing: 1px;
-            text-transform: uppercase;
+            font-weight: bold;
         }
 
         #game-container {
             position: relative;
-            width: 90vw;
-            max-width: 400px;
+            width: 95vw;
+            max-width: 600px; /* Increased map size for desktop */
             aspect-ratio: 1 / 1;
-            border: 4px solid #30363d;
-            border-radius: 12px;
-            overflow: hidden;
+            border: 3px solid #30363d;
+            border-radius: 8px;
             background: #161b22;
         }
 
@@ -58,11 +54,10 @@
             height: 100%;
         }
 
-        /* Start/Game Over Overlay */
         #overlay {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(13, 17, 23, 0.85);
+            background: rgba(13, 17, 23, 0.8);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -72,55 +67,38 @@
         }
 
         .btn-start {
-            padding: 12px 30px;
+            padding: 15px 40px;
             font-size: 1.2rem;
             background: var(--snake-head);
-            color: #000;
             border: none;
-            border-radius: 25px;
+            border-radius: 30px;
             cursor: pointer;
             font-weight: bold;
-            transition: transform 0.2s;
         }
 
-        .btn-start:active { transform: scale(0.95); }
-
-        /* Mobile Controls - D-Pad */
         #controls {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-            margin-top: 30px;
+            gap: 10px;
+            margin-top: 20px;
         }
 
         .btn-dir {
-            width: 65px;
-            height: 65px;
+            width: 60px;
+            height: 60px;
             background: #21262d;
-            border: 1px solid #30363d;
             color: var(--snake-head);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
+            font-size: 1.2rem;
             user-select: none;
-            box-shadow: 0 4px 0 #000;
+            border: 1px solid #30363d;
         }
-
-        .btn-dir:active {
-            transform: translateY(3px);
-            box-shadow: 0 1px 0 #000;
-            background: #30363d;
-        }
-
-        .up { grid-column: 2; }
-        .left { grid-column: 1; }
-        .down { grid-column: 2; }
-        .right { grid-column: 3; }
 
         @media (min-width: 768px) {
-            #controls { display: none; } /* Hide buttons on desktop PC */
+            #controls { display: none; }
         }
     </style>
 </head>
@@ -134,27 +112,23 @@
     <div id="game-container">
         <canvas id="snakeGame"></canvas>
         <div id="overlay">
-            <h2 id="msg">READY?</h2>
-            <button class="btn-start" onclick="startGame()">START GAME</button>
+            <h2 id="msg">LARGE MAP MODE</h2>
+            <button class="btn-start" onclick="startGame()">START</button>
         </div>
     </div>
 
     <div id="controls">
-        <div class="btn-dir up" onpointerdown="changeDir('UP')">▲</div>
-        <div class="btn-dir left" onpointerdown="changeDir('LEFT')">◀</div>
-        <div class="btn-dir down" onpointerdown="changeDir('DOWN')">▼</div>
-        <div class="btn-dir right" onpointerdown="changeDir('RIGHT')">▶</div>
+        <div style="grid-column: 2" class="btn-dir" onpointerdown="changeDir('UP')">▲</div>
+        <div style="grid-column: 1" class="btn-dir" onpointerdown="changeDir('LEFT')">◀</div>
+        <div style="grid-column: 2" class="btn-dir" onpointerdown="changeDir('DOWN')">▼</div>
+        <div style="grid-column: 3" class="btn-dir" onpointerdown="changeDir('RIGHT')">▶</div>
     </div>
 
     <script>
-        /**
-         * SERVICE WORKER LOGGING
-         */
+        // Service Worker Logic Placeholder
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js').catch(() => {
-                    console.log('SW file not found, but logic is ready.');
-                });
+                navigator.serviceWorker.register('./sw.js').catch(() => {});
             });
         }
 
@@ -165,26 +139,25 @@
         const overlay = document.getElementById("overlay");
         const msgText = document.getElementById("msg");
 
-        // Settings
-        const gridSize = 20; 
+        // MAP ADJUSTMENTS
+        const gridSize = 15; // Smaller grid units = more tiles on screen
         let tileCount;
         let score = 0;
         let highScore = localStorage.getItem("snakeHigh") || 0;
         highscoreElement.innerText = highScore;
 
-        // Game State
         let snake = [];
         let food = {x: 5, y: 5};
         let dx = 0; let dy = 0;
         let nextDx = 0; let nextDy = 0;
         let isRunning = false;
-        let gameLoop;
 
         function resize() {
             const container = document.getElementById('game-container');
             const size = container.clientWidth;
             canvas.width = size;
             canvas.height = size;
+            // Recalculate how many tiles fit in the new size
             tileCount = Math.floor(canvas.width / gridSize);
         }
 
@@ -200,13 +173,11 @@
 
         function loop() {
             if (!isRunning) return;
-
             if (didGameEnd()) {
                 endGame();
                 return;
             }
 
-            // Slower Speed: 160ms (approx 6 frames per second)
             setTimeout(() => {
                 clearCanvas();
                 drawFood();
@@ -219,22 +190,24 @@
         function clearCanvas() {
             ctx.fillStyle = "#161b22";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Optional: Draw subtle grid lines
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.03)";
+            for(let i=0; i<canvas.width; i+=gridSize) {
+                ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width,i); ctx.stroke();
+            }
         }
 
         function drawSnake() {
             snake.forEach((part, index) => {
                 ctx.fillStyle = (index === 0) ? "#00ff88" : "#00bd68";
-                ctx.beginPath();
-                ctx.roundRect(part.x * gridSize, part.y * gridSize, gridSize - 2, gridSize - 2, 4);
-                ctx.fill();
+                ctx.fillRect(part.x * gridSize, part.y * gridSize, gridSize - 1, gridSize - 1);
             });
         }
 
         function advanceSnake() {
-            dx = nextDx;
-            dy = nextDy;
-            
-            // If game just started and no direction is picked, don't move
+            dx = nextDx; dy = nextDy;
             if (dx === 0 && dy === 0) return;
 
             const head = {x: snake[0].x + dx, y: snake[0].y + dy};
@@ -251,17 +224,11 @@
 
         function didGameEnd() {
             if (dx === 0 && dy === 0) return false;
-            
-            const hitLeft = snake[0].x < 0;
-            const hitRight = snake[0].x >= tileCount;
-            const hitTop = snake[0].y < 0;
-            const hitBottom = snake[0].y >= tileCount;
-            
-            let selfBite = false;
+            if (snake[0].x < 0 || snake[0].x >= tileCount || snake[0].y < 0 || snake[0].y >= tileCount) return true;
             for (let i = 4; i < snake.length; i++) {
-                if (snake[i].x === snake[0].x && snake[i].y === snake[0].y) selfBite = true;
+                if (snake[i].x === snake[0].x && snake[i].y === snake[0].y) return true;
             }
-            return hitLeft || hitRight || hitTop || hitBottom || selfBite;
+            return false;
         }
 
         function endGame() {
@@ -278,20 +245,11 @@
         function createFood() {
             food.x = Math.floor(Math.random() * tileCount);
             food.y = Math.floor(Math.random() * tileCount);
-            // Ensure food doesn't spawn on snake
-            snake.forEach(part => {
-                if(part.x === food.x && part.y === food.y) createFood();
-            });
         }
 
         function drawFood() {
             ctx.fillStyle = "#ff4d4d";
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = "#ff4d4d";
-            ctx.beginPath();
-            ctx.arc((food.x * gridSize) + gridSize/2, (food.y * gridSize) + gridSize/2, gridSize/2.5, 0, Math.PI*2);
-            ctx.fill();
-            ctx.shadowBlur = 0;
+            ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize - 1, gridSize - 1);
         }
 
         function changeDir(direction) {
@@ -309,7 +267,9 @@
         });
 
         function resetGame() {
-            snake = [{x: 10, y: 10}, {x: 10, y: 11}, {x: 10, y: 12}];
+            // Start in the middle of the larger map
+            const middle = Math.floor(tileCount / 2);
+            snake = [{x: middle, y: middle}, {x: middle, y: middle+1}, {x: middle, y: middle+2}];
             score = 0;
             scoreElement.innerText = score;
             dx = 0; dy = 0; nextDx = 0; nextDy = 0;
