@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tetris Evolution</title>
+    <title>Tetris Evolution - Countdown Edition</title>
     <style>
         :root {
             --bg-color: #0d1117;
@@ -28,6 +28,7 @@
         }
 
         #game-container {
+            position: relative; /* 为倒计时定位 */
             display: flex;
             flex-direction: row;
             gap: 20px;
@@ -36,6 +37,38 @@
             border-radius: 12px;
             border: 1px solid var(--border-color);
             box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+        }
+
+        /* 倒计时遮罩层 */
+        #overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(13, 17, 23, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            border-radius: 12px;
+            pointer-events: none; /* 倒计时时不影响点击 */
+            display: none;
+        }
+
+        #countdown-text {
+            font-size: 8rem;
+            font-weight: 900;
+            color: var(--accent-color);
+            text-shadow: 0 0 20px rgba(88, 166, 255, 0.5);
+        }
+
+        .count-anim {
+            animation: countZoom 1s ease-out forwards;
+        }
+
+        @keyframes countZoom {
+            0% { transform: scale(2); opacity: 0; }
+            20% { transform: scale(1); opacity: 1; }
+            80% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(0.5); opacity: 0; }
         }
 
         canvas {
@@ -60,19 +93,8 @@
             border: 1px solid var(--border-color);
         }
 
-        .stat-label { 
-            font-size: 0.75rem; 
-            text-transform: uppercase; 
-            letter-spacing: 1px;
-            color: #8b949e; 
-            margin-bottom: 5px;
-        }
-        
-        .stat-value { 
-            font-size: 1.6rem; 
-            font-weight: 800; 
-            color: var(--accent-color); 
-        }
+        .stat-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #8b949e; margin-bottom: 5px;}
+        .stat-value { font-size: 1.6rem; font-weight: 800; color: var(--accent-color); }
 
         #controls {
             display: none;
@@ -95,16 +117,8 @@
             transition: all 0.1s;
         }
 
-        .btn:active { 
-            background: var(--accent-color); 
-            transform: scale(0.95);
-        }
-
-        .reset-btn {
-            background: #238636;
-            border: none;
-            margin-top: 10px;
-        }
+        .btn:active { background: var(--accent-color); transform: scale(0.95); }
+        .reset-btn { background: #238636; border: none; margin-top: 10px; }
 
         @media (max-width: 650px) {
             #game-container { flex-direction: column; padding: 15px; }
@@ -118,6 +132,10 @@
 <body>
 
 <div id="game-container">
+    <div id="overlay">
+        <div id="countdown-text"></div>
+    </div>
+
     <canvas id="tetris" width="240" height="400"></canvas>
     
     <div class="side-panel">
@@ -131,7 +149,7 @@
             <canvas id="next" width="80" height="80"></canvas>
         </div>
 
-        <button class="btn reset-btn" onclick="resetGame()">RESET</button>
+        <button class="btn reset-btn" onclick="startWithCountdown()">START</button>
     </div>
 </div>
 
@@ -145,18 +163,18 @@
 </div>
 
 <script>
-    // Constants & Pieces
     const canvas = document.getElementById('tetris');
     const context = canvas.getContext('2d');
     const nextCanvas = document.getElementById('next');
     const nextContext = nextCanvas.getContext('2d');
+    const overlay = document.getElementById('overlay');
+    const countdownText = document.getElementById('countdown-text');
 
     context.scale(20, 20);
     nextContext.scale(20, 20);
 
-    const colors = [
-        null, '#ff5e57', '#00d8ff', '#05c46b', '#ef57ff', '#ffa801', '#ffdd59', '#3c40c6',
-    ];
+    const colors = [null, '#ff5e57', '#00d8ff', '#05c46b', '#ef57ff', '#ffa801', '#ffdd59', '#3c40c6'];
+    let gameRunning = false; // 控制游戏逻辑是否运行
 
     function createPiece(type) {
         if (type === 'I') return [[0, 1, 0, 0], [0, 1, 0, 0], [0, 1, 0, 0], [0, 1, 0, 0]];
@@ -168,23 +186,10 @@
         else if (type === 'T') return [[0, 7, 0], [7, 7, 7], [0, 0, 0]];
     }
 
-    // Logic Functions
     function createMatrix(w, h) {
         const matrix = [];
         while (h--) matrix.push(new Array(w).fill(0));
         return matrix;
-    }
-
-    function draw() {
-        context.fillStyle = '#010409';
-        context.fillRect(0, 0, canvas.width, canvas.height);
-        
-        drawMatrix(arena, {x: 0, y: 0}, context);
-        drawMatrix(player.matrix, player.pos, context);
-        
-        nextContext.fillStyle = '#0d1117';
-        nextContext.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
-        drawMatrix(player.next, {x: 1, y: 1}, nextContext);
     }
 
     function drawMatrix(matrix, offset, ctx) {
@@ -201,12 +206,21 @@
         });
     }
 
+    function draw() {
+        context.fillStyle = '#010409';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        drawMatrix(arena, {x: 0, y: 0}, context);
+        if (player.matrix) drawMatrix(player.matrix, player.pos, context);
+        
+        nextContext.fillStyle = '#0d1117';
+        nextContext.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
+        if (player.next) drawMatrix(player.next, {x: 1, y: 1}, nextContext);
+    }
+
     function merge(arena, player) {
         player.matrix.forEach((row, y) => {
             row.forEach((value, x) => {
-                if (value !== 0) {
-                    arena[y + player.pos.y][x + player.pos.x] = value;
-                }
+                if (value !== 0) arena[y + player.pos.y][x + player.pos.x] = value;
             });
         });
     }
@@ -215,9 +229,7 @@
         const [m, o] = [player.matrix, player.pos];
         for (let y = 0; y < m.length; ++y) {
             for (let x = 0; x < m[y].length; ++x) {
-                if (m[y][x] !== 0 && (arena[y + o.y] && arena[y + o.y][x + o.x]) !== 0) {
-                    return true;
-                }
+                if (m[y][x] !== 0 && (arena[y + o.y] && arena[y + o.y][x + o.x]) !== 0) return true;
             }
         }
         return false;
@@ -240,15 +252,14 @@
 
     function rotate(matrix, dir) {
         for (let y = 0; y < matrix.length; ++y) {
-            for (let x = 0; x < y; ++x) {
-                [matrix[x][y], matrix[y][x]] = [matrix[y][x], matrix[x][y]];
-            }
+            for (let x = 0; x < y; ++x) [matrix[x][y], matrix[y][x]] = [matrix[y][x], matrix[x][y]];
         }
         if (dir > 0) matrix.forEach(row => row.reverse());
         else matrix.reverse();
     }
 
     function playerDrop() {
+        if (!gameRunning) return;
         player.pos.y++;
         if (collide(arena, player)) {
             player.pos.y--;
@@ -260,13 +271,13 @@
     }
 
     function playerMove(dir) {
+        if (!gameRunning) return;
         player.pos.x += dir;
-        if (collide(arena, player)) {
-            player.pos.x -= dir;
-        }
+        if (collide(arena, player)) player.pos.x -= dir;
     }
 
     function playerRotate(dir) {
+        if (!gameRunning) return;
         const pos = player.pos.x;
         let offset = 1;
         rotate(player.matrix, dir);
@@ -283,32 +294,52 @@
 
     function playerReset() {
         const pieces = 'ILJOTSZ';
-        if (!player.next) {
-            player.next = createPiece(pieces[pieces.length * Math.random() | 0]);
-        }
+        if (!player.next) player.next = createPiece(pieces[pieces.length * Math.random() | 0]);
         player.matrix = player.next;
         player.next = createPiece(pieces[pieces.length * Math.random() | 0]);
         player.pos.y = 0;
         player.pos.x = (arena[0].length / 2 | 0) - (player.matrix[0].length / 2 | 0);
         
         if (collide(arena, player)) {
-            // Game Over Log Point
-            console.log("Game Over. Score:", player.score);
+            gameRunning = false;
             arena.forEach(row => row.fill(0));
             player.score = 0;
             updateScore();
+            alert("GAME OVER!");
         }
     }
 
-    function updateScore() {
-        document.getElementById('score').innerText = player.score;
-    }
-
-    function resetGame() {
+    // 倒计时核心逻辑
+    function startWithCountdown() {
+        if (gameRunning) return; // 防止重复点击
+        
+        // 重置游戏状态
         arena.forEach(row => row.fill(0));
         player.score = 0;
         updateScore();
         playerReset();
+
+        overlay.style.display = 'flex';
+        let count = 3;
+        
+        const runCount = () => {
+            if (count > 0) {
+                countdownText.innerText = count;
+                countdownText.classList.remove('count-anim');
+                void countdownText.offsetWidth; // 触发重绘
+                countdownText.classList.add('count-anim');
+                count--;
+                setTimeout(runCount, 1000);
+            } else {
+                overlay.style.display = 'none';
+                gameRunning = true;
+            }
+        };
+        runCount();
+    }
+
+    function updateScore() {
+        document.getElementById('score').innerText = player.score;
     }
 
     let dropCounter = 0;
@@ -318,8 +349,12 @@
     function update(time = 0) {
         const deltaTime = time - lastTime;
         lastTime = time;
-        dropCounter += deltaTime;
-        if (dropCounter > dropInterval) playerDrop();
+
+        if (gameRunning) {
+            dropCounter += deltaTime;
+            if (dropCounter > dropInterval) playerDrop();
+        }
+        
         draw();
         requestAnimationFrame(update);
     }
@@ -334,9 +369,10 @@
         else if (event.keyCode === 38 || event.keyCode === 87) playerRotate(1);
     });
 
-    playerReset();
-    updateScore();
+    // 初始化显示
     update();
+    // 首次进入自动倒计时
+    setTimeout(startWithCountdown, 500);
 </script>
 </body>
 </html>
