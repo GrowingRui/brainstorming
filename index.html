@@ -13,54 +13,82 @@
         <p>Pick a game and start playing!</p>
     </header>
 
-    <main class="game-grid">
-        <div class="game-card" onclick="openGame('game1/index.html', 'Snake Pro')">
-            <img src="images/snake.jpg" alt="Snake Game Preview">
-            <div class="game-info">
-                <h3>Snake Pro</h3>
-                <p>Classic arcade action. Use arrow keys to grow.</p>
-            </div>
-        </div>
-
-        <div class="game-card" onclick="openGame('game2/index.html', 'Space Shooter')">
-            <img src="images/space.jpg" alt="Space Shooter Preview">
-            <div class="game-info">
-                <h3>Space Shooter</h3>
-                <p>Protect the galaxy from invading aliens.</p>
-            </div>
-        </div>
-
-        </main>
+    <main class="game-grid" id="game-container"></main>
 
     <div id="game-overlay">
         <div class="overlay-bar">
             <span id="game-title-display">Loading...</span>
-            <button class="exit-button" onclick="closeGame()">EXIT GAME</button>
+            <button class="exit-button" onclick="closeGame()">EXIT GAME (Esc)</button>
         </div>
         <iframe id="game-iframe" src=""></iframe>
     </div>
 
     <script>
+        const games = [
+            { 
+                title: "24 point", 
+                path: "24-point-game/index.html", 
+                img: "images/24pint.jpg", 
+                desc: "Use your brain to find the answer！" 
+            },
+            { 
+                title: "Five in a row", 
+                path: "Five-in-a-Row/index.html", 
+                img: "images/five.jpg", 
+                desc: "You are the winner!" 
+            },
+            { 
+                title: "What2Wear", 
+                path: "What2Wear/index.html", 
+                img: "images/What2Wear.jpg", 
+                desc: "Your personal weather App!" 
+            },
+            
+        ];
+
+        /* ---------------------------------------------------------
+           2. 自动生成卡片的逻辑 (THE LOGIC)
+           --------------------------------------------------------- */
+        const container = document.getElementById('game-container');
+
+        // 遍历数组，为每个游戏生成 HTML
+        games.forEach(game => {
+            const card = document.createElement('div');
+            card.className = 'game-card';
+            
+            // 点击卡片调用 openGame 函数
+            card.onclick = () => openGame(game.path, game.title);
+
+            card.innerHTML = `
+                <img src="${game.img}" alt="${game.title}">
+                <div class="game-info">
+                    <h3>${game.title}</h3>
+                    <p>${game.desc}</p>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+
+        /* ---------------------------------------------------------
+           3. 游戏运行控制 (THE CONTROLS)
+           --------------------------------------------------------- */
         const overlay = document.getElementById('game-overlay');
         const iframe = document.getElementById('game-iframe');
         const titleDisplay = document.getElementById('game-title-display');
 
-        // 打开游戏：传入路径和游戏名称
         function openGame(url, title) {
             titleDisplay.innerText = title;
             iframe.src = url;
             overlay.style.display = 'flex';
-            document.body.style.overflow = 'hidden'; // 防止主页面在后台滚动
+            document.body.style.overflow = 'hidden';
         }
 
-        // 关闭游戏
         function closeGame() {
             overlay.style.display = 'none';
-            iframe.src = ''; // 清空 src 会立即停止游戏声音和运行
+            iframe.src = '';
             document.body.style.overflow = 'auto';
         }
 
-        // 允许按 ESC 键退出游戏
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closeGame();
         });
