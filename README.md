@@ -8,7 +8,11 @@ New games will be added over time as the project continues to grow.
 
 ## Current Games
 
-Please click the link below to access the games:
+Please click the link below to access the games dashboard:
+
+Currently unavailable, adding new games...
+
+Please click the link below to access each game:
 
 24 point -> https://growingrui.github.io/brainstorming/24-point-game
 
