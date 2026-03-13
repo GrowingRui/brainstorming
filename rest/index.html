@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gourmet iPad System</title>
+    <style>
+        :root { --gold: #ae946d; --dark: #1a1a1a; --grey: #f8f9fa; --border: #e0e0e0; }
+        body { font-family: 'Optima', sans-serif; margin: 0; background: var(--grey); color: var(--dark); overflow: hidden; }
+        
+        .screen { display: none; height: 100vh; flex-direction: column; }
+        .screen.active { display: flex; }
+        header { background: var(--dark); color: white; padding: 20px; text-align: center; letter-spacing: 3px; }
+        .content { flex: 1; padding: 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+
+        .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); width: 85%; max-width: 650px; text-align: center; }
+        .btn { padding: 18px 35px; border: none; border-radius: 4px; font-size: 1.1rem; cursor: pointer; transition: 0.3s; margin: 10px; min-width: 250px; }
+        .btn-gold { background: var(--gold); color: white; }
+        .btn-outline { background: transparent; border: 2px solid var(--gold); color: var(--gold); }
+
+        .comensal-row { display: flex; align-items: center; justify-content: space-between; padding: 15px; border-bottom: 1px solid var(--border); width: 100%; box-sizing: border-box; }
+        select { padding: 10px; border-radius: 4px; border: 1px solid var(--border); width: 50%; font-size: 1rem; }
+    </style>
+</head>
+<body>
+
+    <section id="step-init" class="screen active">
+        <header><h1>INICIALIZACIÓN</h1></header>
+        <div class="content">
+            <div class="card">
+                <h2>Número de comensales</h2>
+                <input type="number" id="num-guests" min="1" max="4" value="1" style="font-size: 3rem; width: 100px; text-align: center; border: 1px solid var(--gold); margin: 20px;">
+                <button class="btn btn-gold" onclick="initOrder()">Confirmar el dato</button>
+            </div>
+        </div>
+    </section>
+
+    <section id="step-order-home" class="screen">
+        <header><h1>HACER PEDIDO</h1></header>
+        <div class="content">
+            <div class="card">
+                <button class="btn btn-outline" onclick="showScreen('step-view-menu')">Ver menú</button>
+                <button class="btn btn-gold" onclick="startPersonalize(1)">Personalizar menú</button>
+            </div>
+        </div>
+    </section>
+
+    <section id="step-view-menu" class="screen">
+        <header><h1>INFORMACIÓN DE PLATOS</h1></header>
+        <div class="content">
+            <div class="card">
+                <p>Detalles técnicos y alérgenos de nuestra carta...</p>
+                <button class="btn btn-outline" onclick="showScreen('step-order-home')">Volver</button>
+            </div>
+        </div>
+    </section>
+
+    <section id="step-personalize" class="screen">
+        <header><h1 id="plato-title">PRIMER PLATO</h1></header>
+        <div class="content">
+            <div id="personalize-rows" class="card"></div>
+            <button class="btn btn-gold" id="next-plato-btn" onclick="nextPlato()">Siguiente</button>
+        </div>
+    </section>
+
+    <section id="step-service-menu" class="screen">
+        <header><h1>GESTIÓN DEL SERVICIO</h1></header>
+        <div class="content">
+            <div class="card">
+                <button class="btn btn-outline" onclick="showPlatoSelection('status')">Seguimiento del estado</button>
+                <button class="btn btn-outline" onclick="showPlatoSelection('clear')">Retirar plato sucio</button>
+                <hr style="margin: 20px 0;">
+                <button class="btn btn-gold" onclick="showScreen('step-payment')">Solicitar la cuenta y pago</button>
+            </div>
+        </div>
+    </section>
+
+    <section id="step-select-plato" class="screen">
+        <header><h1>SELECCIONAR EL PLATO</h1></header>
+        <div class="content">
+            <div class="card">
+                <button class="btn btn-outline" onclick="handlePlatoAction(1)">Primer Plato</button>
+                <button class="btn btn-outline" onclick="handlePlatoAction(2)">Segundo Plato</button>
+                <button class="btn btn-outline" onclick="handlePlatoAction(3)">Tercer Plato</button>
+                <button class="btn btn-gold" onclick="showScreen('step-service-menu')">Volver</button>
+            </div>
+        </div>
+    </section>
+
+    <section id="step-view-status" class="screen">
+        <header><h1>ESTADO DEL PLATO</h1></header>
+        <div class="content">
+            <div class="card">
+                <h2 id="status-plato-name">PLATO</h2>
+                <div style="font-size: 1.5rem; color: var(--gold); margin: 20px;" id="status-display">En preparación...</div>
+                <button class="btn btn-gold" onclick="showScreen('step-select-plato')">Volver</button>
+            </div>
+        </div>
+    </section>
+
+    <section id="step-payment" class="screen">
+        <header><h1>PAGO</h1></header>
+        <div class="content">
+            <div class="card">
+                <h2>Total: <span id="final-price">0.00</span> €</h2>
+                <button class="btn btn-gold" onclick="choosePayment('tarjeta')">Pago con tarjeta</button>
+                <button class="btn btn-gold" onclick="choosePayment('efectivo')">Pago con efectivo</button>
+                
+                <div id="card-section" style="display:none; margin-top: 20px;">
+                    <p style="color: #666;"><i>Por favor, inserte o acerque la tarjeta...</i></p>
+                    <button class="btn btn-gold" onclick="confirmFinal()">Confirmar el pago</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+<script>
+    let guestCount = 0;
+    let currentStep = 1; 
+    let serviceAction = ''; // 'status' or 'clear'
+    const platoNames = ["", "PRIMER PLATO", "SEGUNDO PLATO", "TERCER PLATO", "BEBIDA Y/O CAFÉ"];
+
+    function showScreen(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+    }
+
+    function initOrder() {
+        guestCount = document.getElementById('num-guests').value;
+        if(guestCount > 4 || guestCount < 1) return alert("Máximo 4 personas");
+        showScreen('step-order-home');
+    }
+
+    function startPersonalize(step) {
+        currentStep = step;
+        document.getElementById('plato-title').innerText = platoNames[step];
+        const container = document.getElementById('personalize-rows');
+        container.innerHTML = '';
+        for(let i = 1; i <= guestCount; i++) {
+            const options = ["Opción A", "Opción B", "Opción C"];
+            if(step === 4) options.unshift("Ninguno");
+            const row = document.createElement('div');
+            row.className = 'comensal-row';
+            row.innerHTML = `<span>Comensal ${i}</span><select>${options.map(o => `<option>${o}</option>`).join('')}</select>`;
+            container.appendChild(row);
+        }
+        document.getElementById('next-plato-btn').innerText = (step === 4) ? "Enviar Pedido" : "Siguiente";
+        showScreen('step-personalize');
+    }
+
+    function nextPlato() {
+        if(currentStep < 4) startPersonalize(currentStep + 1);
+        else {
+            alert("Pedido enviado.");
+            document.getElementById('final-price').innerText = (guestCount * 48.50).toFixed(2);
+            showScreen('step-service-menu');
+        }
+    }
+
+    // Gestion del servicio logic
+    function showPlatoSelection(action) {
+        serviceAction = action;
+        showScreen('step-select-plato');
+    }
+
+    function handlePlatoAction(platoIdx) {
+        const name = ["", "Primer Plato", "Segundo Plato", "Tercer Plato"][platoIdx];
+        if(serviceAction === 'status') {
+            document.getElementById('status-plato-name').innerText = name;
+            document.getElementById('status-display').innerText = (platoIdx === 1) ? "✓ Servido" : "⌛ En cocina";
+            showScreen('step-view-status');
+        } else {
+            alert(`Solicitud enviada: Retirar ${name} de la mesa.`);
+            showScreen('step-service-menu');
+        }
+    }
+
+    function choosePayment(method) {
+        if(method === 'tarjeta') {
+            document.getElementById('card-section').style.display = 'block';
+        } else {
+            alert("El camarero se acercará para el pago en efectivo.");
+            location.reload();
+        }
+    }
+
+    function confirmFinal() {
+        alert("Pago confirmado con tarjeta. ¡Gracias!");
+        location.reload();
+    }
+</script>
+</body>
+</html>
