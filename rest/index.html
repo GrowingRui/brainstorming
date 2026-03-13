@@ -73,8 +73,8 @@
         <header><h1>GESTIÓN DEL SERVICIO</h1></header>
         <div class="content" style="justify-content: center;">
             <div class="card">
-                <button class="btn btn-outline" onclick="showPlatoList('status')">Seguimiento del estado</button>
-                <button class="btn btn-outline" onclick="showPlatoList('clear')">Retirar plato sucio</button>
+                <button class="btn btn-outline" onclick="showPlatoList()">Seguimiento del estado</button>
+                <button class="btn btn-outline" onclick="alert('Solicitud enviada: El camarero se acerca para retirar los platos sucios.')">Retirar plato sucio</button>
                 <hr style="margin: 20px 0;">
                 <button class="btn btn-gold" onclick="showScreen('step-payment')">Solicitar la cuenta y pago</button>
             </div>
@@ -82,7 +82,7 @@
     </section>
 
     <section id="step-select-specific" class="screen">
-        <header><h1 id="select-title">SELECCIONAR PLATO</h1></header>
+        <header><h1>SEGUIMIENTO DEL ESTADO</h1></header>
         <div class="content">
             <div id="plato-list-container" style="width: 100%; max-width: 600px;">
                 </div>
@@ -91,7 +91,7 @@
     </section>
 
     <section id="step-view-status" class="screen">
-        <header><h1>ESTADO DEL PLATO</h1></header>
+        <header><h1>DETALLE DEL ESTADO</h1></header>
         <div class="content" style="justify-content: center;">
             <div class="card">
                 <h2 id="display-dish-name">Nombre del plato</h2>
@@ -123,7 +123,6 @@
     let guestCount = 0;
     let currentStep = 1;
     let selectedOrder = []; 
-    let serviceMode = ''; 
 
     const menuData = [
         [],
@@ -176,9 +175,8 @@
         }
     }
 
-    function showPlatoList(mode) {
-        serviceMode = mode;
-        document.getElementById('select-title').innerText = mode === 'status' ? "SEGUIMIENTO" : "RETIRAR PLATO";
+    // Solo muestra la lista para Seguimiento
+    function showPlatoList() {
         const container = document.getElementById('plato-list-container');
         container.innerHTML = '';
         
@@ -191,8 +189,8 @@
                     <span class="tag">Comensal ${item.comensal}</span>
                     <div style="font-weight:bold; margin-top:5px;">${item.name}</div>
                 </div>
-                <button class="btn-gold" style="padding:10px 20px; border-radius:4px; border:none; min-width:100px;" onclick="doAction(${index})">
-                    ${mode === 'status' ? 'Ver' : 'Retirar'}
+                <button class="btn-gold" style="padding:10px 20px; border-radius:4px; border:none; min-width:100px;" onclick="viewStatusDetail(${index})">
+                    Ver
                 </button>
             `;
             container.appendChild(div);
@@ -200,19 +198,13 @@
         showScreen('step-select-specific');
     }
 
-    function doAction(idx) {
+    function viewStatusDetail(idx) {
         const item = selectedOrder[idx];
-        if(serviceMode === 'status') {
-            // 进入详情页
-            document.getElementById('display-dish-name').innerText = item.name;
-            document.getElementById('display-dish-info').innerText = `Comensal ${item.comensal} (${item.type})`;
-            document.getElementById('display-status-label').innerText = idx < guestCount ? "✓ Servido" : "⌛ Preparando...";
-            showScreen('step-view-status');
-        } else {
-            // 直接执行 retirar，不跳页面
-            alert(`Solicitud enviada: El camarero retirará el plato "${item.name}" del Comensal ${item.comensal}.`);
-            // 可选：在界面上移除该项或更新状态
-        }
+        document.getElementById('display-dish-name').innerText = item.name;
+        document.getElementById('display-dish-info').innerText = `Comensal ${item.comensal} (${item.type})`;
+        // Mock logic: los primeros platos ya están servidos, el resto en cocina
+        document.getElementById('display-status-label').innerText = item.type === "PRIMERO" ? "✓ Servido" : "⌛ Preparando...";
+        showScreen('step-view-status');
     }
 
     function startCardPayment() {
