@@ -21,7 +21,7 @@
         .comensal-row { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid var(--border); width: 100%; box-sizing: border-box; }
         select { padding: 8px; border-radius: 4px; border: 1px solid var(--border); width: 55%; font-size: 0.95rem; }
         
-        .item-card { border: 1px solid var(--border); border-radius: 8px; padding: 15px; margin: 10px 0; text-align: left; display: flex; justify-content: space-between; align-items: center; }
+        .item-card { border: 1px solid var(--border); border-radius: 8px; padding: 15px; margin: 10px 0; text-align: left; display: flex; justify-content: space-between; align-items: center; width: 100%; box-sizing: border-box; }
         .tag { font-size: 0.8rem; background: #eee; padding: 3px 8px; border-radius: 10px; margin-right: 5px; }
     </style>
 </head>
@@ -105,7 +105,7 @@
     <section id="step-payment" class="screen">
         <header><h1>PAGO</h1></header>
         <div class="content" style="justify-content: center;">
-            <div class="card" id="payment-main-card">
+            <div class="card">
                 <h2>Total: <span id="final-price">0.00</span> €</h2>
                 <div id="payment-options">
                     <button class="btn btn-gold" onclick="startCardPayment()">Pago con tarjeta</button>
@@ -122,13 +122,13 @@
 <script>
     let guestCount = 0;
     let currentStep = 1;
-    let selectedOrder = []; // Store order details: {comensal, platoType, dishName}
+    let selectedOrder = []; 
     let serviceMode = ''; 
 
     const menuData = [
         [],
-        ["Gazpacho Andaluz", "Ensalada de Burrata con Tomate", "Crema de Calabacín"],
-        ["Entrecot de Buey al Punto", "Salmón al Horno con Eneldo", "Risotto de Setas Silvestres"],
+        ["Gazpacho Andaluz", "Ensalada de Burrata", "Crema de Calabacín"],
+        ["Entrecot de Buey", "Salmón al Horno", "Risotto de Setas"],
         ["Tiramisú Casero", "Coulant de Chocolate", "Fruta de la Pasión"],
         ["Ninguno", "Vino Tinto Rioja", "Agua Mineral", "Café Solo", "Capuccino"]
     ];
@@ -162,7 +162,6 @@
     }
 
     function nextPlato() {
-        // Save current selections
         for(let i = 1; i <= guestCount; i++) {
             const dish = document.getElementById(`sel-${i}`).value;
             if(dish !== "Ninguno") {
@@ -171,7 +170,7 @@
         }
         if(currentStep < 4) startPersonalize(currentStep + 1);
         else {
-            alert("Pedido enviado a cocina.");
+            alert("Pedido enviado.");
             document.getElementById('final-price').innerText = (guestCount * 55).toFixed(2);
             showScreen('step-service-menu');
         }
@@ -185,14 +184,14 @@
         
         selectedOrder.forEach((item, index) => {
             const div = document.createElement('div');
-            div.className = 'card item-card';
+            div.className = 'item-card card';
             div.innerHTML = `
                 <div>
                     <span class="tag">${item.type}</span>
                     <span class="tag">Comensal ${item.comensal}</span>
                     <div style="font-weight:bold; margin-top:5px;">${item.name}</div>
                 </div>
-                <button class="btn-gold" style="padding:10px; border-radius:4px; border:none;" onclick="doAction(${index})">
+                <button class="btn-gold" style="padding:10px 20px; border-radius:4px; border:none; min-width:100px;" onclick="doAction(${index})">
                     ${mode === 'status' ? 'Ver' : 'Retirar'}
                 </button>
             `;
@@ -204,13 +203,15 @@
     function doAction(idx) {
         const item = selectedOrder[idx];
         if(serviceMode === 'status') {
+            // 进入详情页
             document.getElementById('display-dish-name').innerText = item.name;
-            document.getElementById('display-dish-info').innerText = `Perteneciente al Comensal ${item.comensal} (${item.type})`;
+            document.getElementById('display-dish-info').innerText = `Comensal ${item.comensal} (${item.type})`;
             document.getElementById('display-status-label').innerText = idx < guestCount ? "✓ Servido" : "⌛ Preparando...";
             showScreen('step-view-status');
         } else {
-            alert(`El camarero retirará: ${item.name} (Comensal ${item.comensal})`);
-            showScreen('step-service-menu');
+            // 直接执行 retirar，不跳页面
+            alert(`Solicitud enviada: El camarero retirará el plato "${item.name}" del Comensal ${item.comensal}.`);
+            // 可选：在界面上移除该项或更新状态
         }
     }
 
@@ -221,7 +222,7 @@
 
     function finishEverything() {
         alert("¡Muchas gracias por su visita!");
-        location.reload(); // 跳回开头
+        location.reload(); 
     }
 </script>
 </body>
