@@ -1,175 +1,254 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <title>Bloxorz: Guaranteed Solvable</title>
-    <style>
-        body { background: #1a1a1a; color: #fff; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
-        #ui-layer { position: absolute; top: 20px; text-align: center; pointer-events: none; }
-        h1 { margin: 0; font-size: 24px; color: #3498db; text-shadow: 2px 2px #000; }
-        .info { color: #888; font-size: 14px; }
-        canvas { background: #000; box-shadow: 0 0 40px rgba(0,0,0,0.5); border: 2px solid #333; }
-        #message { position: absolute; bottom: 50px; font-size: 20px; font-weight: bold; transition: all 0.3s; }
-    </style>
+<meta charset="UTF-8">
+<title>Precision Roller - 完整修正版</title>
+<style>
+    body {
+        background: #121212;
+        color: white;
+        font-family: 'Segoe UI', system-ui, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+        overflow: hidden;
+    }
+
+    #ui {
+        position: absolute;
+        top: 30px;
+        text-align: center;
+        pointer-events: none;
+    }
+
+    h1 {
+        margin: 0;
+        font-size: 32px;
+        letter-spacing: 4px;
+        color: #3498db;
+        text-shadow: 0 0 15px rgba(52, 152, 219, 0.4);
+    }
+
+    .info {
+        color: #666;
+        font-size: 14px;
+        margin-top: 8px;
+        text-transform: uppercase;
+    }
+
+    canvas {
+        background: #000;
+        box-shadow: 0 0 60px rgba(0, 0, 0, 0.9);
+        border: 1px solid #333;
+        border-radius: 8px;
+    }
+
+    #message {
+        position: absolute;
+        bottom: 80px;
+        font-size: 28px;
+        font-weight: bold;
+        letter-spacing: 1px;
+    }
+
+    .hint {
+        position: absolute;
+        bottom: 30px;
+        color: #444;
+        font-size: 13px;
+    }
+</style>
 </head>
 <body>
 
-    <div id="ui-layer">
-        <h1>PRECISION ROLLER</h1>
-        <div class="info">Guaranteed Path Algorithm Active</div>
-    </div>
+<div id="ui">
+    <h1>PRECISION ROLLER</h1>
+    <div class="info">地形簇状生成算法 | 100% 可达性</div>
+</div>
 
-    <canvas id="gameCanvas"></canvas>
-    <div id="message"></div>
+<canvas id="game"></canvas>
+<div id="message"></div>
+<div class="hint">方向键：滚动 | R键：重置地图</div>
 
-    <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const msgDiv = document.getElementById('message');
+<script>
+/**
+ * 核心设计逻辑：
+ * 1. 自动生成：从终点反向模拟方块滚动，确保生成的路径玩家绝对可以到达。
+ * 2. 地形填充：在路径周围随机填充相邻地砖，解决“中间是空的”视觉问题。
+ * 3. 状态机：Standing (1x1), Lying_H (2x1), Lying_V (1x2)。
+ */
 
-        const TILE_SIZE = 35;
-        const COLS = 20;
-        const ROWS = 12;
-        
-        let map = [];
-        let block = {};
-        let target = {x: 0, y: 0};
-        let gameOver = false;
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const msg = document.getElementById("message");
 
-        function generateSolvableMap() {
-            // 1. 初始化全黑地图
-            map = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+const TILE = 40;
+const COLS = 20;
+const ROWS = 12;
+
+let map = [];
+let block = {};
+let target = { x: 0, y: 0 };
+let gameOver = false;
+
+// 1. 核心：方块滚动模拟器 (物理与状态逻辑)
+function simulate(b, dir) {
+    let r = JSON.parse(JSON.stringify(b));
+    if (r.state === "standing") {
+        if (dir === "left") { r.x1 -= 2; r.x2 = r.x1 + 1; r.y2 = r.y1; r.state = "lying_h"; }
+        else if (dir === "right") { r.x1 += 1; r.x2 = r.x1 + 1; r.y2 = r.y1; r.state = "lying_h"; }
+        else if (dir === "up") { r.y1 -= 2; r.y2 = r.y1 + 1; r.x2 = r.x1; r.state = "lying_v"; }
+        else if (dir === "down") { r.y1 += 1; r.y2 = r.y1 + 1; r.x2 = r.x1; r.state = "lying_v"; }
+    } 
+    else if (r.state === "lying_h") {
+        if (dir === "left") { r.x1 -= 1; r.x2 = r.x1; r.state = "standing"; }
+        else if (dir === "right") { r.x1 += 2; r.x2 = r.x1; r.state = "standing"; }
+        else if (dir === "up") { r.y1 -= 1; r.y2 -= 1; }
+        else if (dir === "down") { r.y1 += 1; r.y2 += 1; }
+    } 
+    else if (r.state === "lying_v") {
+        if (dir === "left") { r.x1 -= 1; r.x2 -= 1; }
+        else if (dir === "right") { r.x1 += 1; r.x2 += 1; }
+        else if (dir === "up") { r.y1 -= 1; r.y2 = r.y1; r.state = "standing"; }
+        else if (dir === "down") { r.y1 += 2; r.y2 = r.y1; r.state = "standing"; }
+    }
+    return r;
+}
+
+// 2. 地图生成：解决“中间是空的”
+function generateMap() {
+    map = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+    
+    // 终点设在中央区域
+    target.x = Math.floor(COLS / 2) + (Math.random() > 0.5 ? 2 : -2);
+    target.y = Math.floor(ROWS / 2);
+    map[target.y][target.x] = 2;
+
+    let cur = { x1: target.x, y1: target.y, x2: target.x, y2: target.y, state: "standing" };
+    let pathHistory = [];
+
+    // 反向迭代生成必经之路
+    for (let i = 0; i < 65; i++) {
+        map[cur.y1][cur.x1] = 1;
+        pathHistory.push({x: cur.x1, y: cur.y1});
+        if (cur.state !== "standing") {
+            map[cur.y2][cur.x2] = 1;
+            pathHistory.push({x: cur.x2, y: cur.y2});
+        }
+
+        let dirs = ["up", "down", "left", "right"];
+        let next = simulate(cur, dirs[Math.floor(Math.random() * 4)]);
+
+        // 边界控制，留出安全边距
+        if (next.x1 >= 2 && next.x1 < COLS - 2 && next.y1 >= 2 && next.y1 < ROWS - 2 &&
+            next.x2 >= 2 && next.x2 < COLS - 2 && next.y2 >= 2 && next.y2 < ROWS - 2) {
+            cur = next;
+        }
+    }
+
+    // 设置玩家起点
+    block = { x1: cur.x1, y1: cur.y1, x2: cur.x2, y2: cur.y2, state: cur.state };
+
+    // 簇状填充：在路径坐标周围随机撒点，让地图变充实
+    pathHistory.forEach(pos => {
+        for(let dy = -1; dy <= 1; dy++) {
+            for(let dx = -1; dx <= 1; dx++) {
+                let nx = pos.x + dx, ny = pos.y + dy;
+                if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
+                    if (map[ny][nx] === 0 && Math.random() > 0.5) {
+                        map[ny][nx] = 1;
+                    }
+                }
+            }
+        }
+    });
+
+    // 确保终点颜色正确
+    map[target.y][target.x] = 2;
+}
+
+// 3. 渲染引擎
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const ox = (canvas.width - COLS * TILE) / 2;
+    const oy = (canvas.height - ROWS * TILE) / 2;
+
+    // 画地面
+    for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+            if (map[y][x] === 0) continue;
+            ctx.fillStyle = (map[y][x] === 2) ? "#e74c3c" : "#2c3e50";
+            ctx.shadowBlur = 0;
+            ctx.fillRect(x * TILE + ox, y * TILE + oy, TILE - 2, TILE - 2);
             
-            // 2. 随机设定终点
-            target.x = Math.floor(Math.random() * (COLS - 6)) + 3;
-            target.y = Math.floor(Math.random() * (ROWS - 6)) + 3;
-            map[target.y][target.x] = 2;
-
-            // 3. 从终点开始反向翻滚模拟
-            let cur = { x1: target.x, y1: target.y, x2: target.x, y2: target.y, state: 'standing' };
-            let steps = 0;
-            const maxSteps = 45; // 模拟翻滚次数
-
-            while (steps < maxSteps) {
-                // 标记当前位置为地板
-                map[cur.y1][cur.x1] = (map[cur.y1][cur.x1] === 2) ? 2 : 1;
-                if (cur.state !== 'standing') {
-                    map[cur.y2][cur.x2] = 1;
-                }
-
-                // 随机选择一个方向进行反向翻滚
-                const dirs = ['up', 'down', 'left', 'right'];
-                const dir = dirs[Math.floor(Math.random() * 4)];
-                let next = simulateMove(cur, dir);
-
-                // 边界检查：确保反向翻滚不会滚出地图边缘
-                if (next.x1 >= 1 && next.x1 < COLS-1 && next.y1 >= 1 && next.y1 < ROWS-1 &&
-                    next.x2 >= 1 && next.x2 < COLS-1 && next.y2 >= 1 && next.y2 < ROWS-1) {
-                    cur = next;
-                    steps++;
-                }
-            }
-
-            // 4. 将最后的位置设为玩家起点
-            block = {
-                x: cur.x1, y: cur.y1,
-                x2: cur.x2, y2: cur.y2,
-                state: cur.state
-            };
-
-            // 5. 额外增加一些随机地板，增加迷惑性
-            for(let i=0; i<40; i++) {
-                let rx = Math.floor(Math.random()*COLS);
-                let ry = Math.floor(Math.random()*ROWS);
-                if(map[ry][rx] === 0) map[ry][rx] = 1;
-            }
+            // 装饰线
+            ctx.strokeStyle = "rgba(255,255,255,0.05)";
+            ctx.strokeRect(x * TILE + ox, y * TILE + oy, TILE - 2, TILE - 2);
         }
+    }
 
-        // 核心物理模拟逻辑（用于生成和移动）
-        function simulateMove(b, dir) {
-            let res = JSON.parse(JSON.stringify(b));
-            if (res.state === 'standing') {
-                if (dir === 'left') { res.x1 -= 2; res.x2 = res.x1 + 1; res.y2 = res.y1; res.state = 'lying_h'; }
-                else if (dir === 'right') { res.x1 += 1; res.x2 = res.x1 + 1; res.y2 = res.y1; res.state = 'lying_h'; }
-                else if (dir === 'up') { res.y1 -= 2; res.y2 = res.y1 + 1; res.x2 = res.x1; res.state = 'lying_v'; }
-                else if (dir === 'down') { res.y1 += 1; res.y2 = res.y1 + 1; res.x2 = res.x1; res.state = 'lying_v'; }
-            } else if (res.state === 'lying_h') {
-                if (dir === 'left') { res.x1 -= 1; res.x2 = res.x1; res.state = 'standing'; }
-                else if (dir === 'right') { res.x1 += 2; res.x2 = res.x1; res.state = 'standing'; }
-                else if (dir === 'up') { res.y1 -= 1; res.y2 -= 1; }
-                else if (dir === 'down') { res.y1 += 1; res.y2 += 1; }
-            } else if (res.state === 'lying_v') {
-                if (dir === 'left') { res.x1 -= 1; res.x2 -= 1; }
-                else if (dir === 'right') { res.x1 += 1; res.x2 += 1; }
-                else if (dir === 'up') { res.y1 -= 1; res.y2 = res.y1; res.state = 'standing'; }
-                else if (dir === 'down') { res.y1 += 2; res.y2 = res.y1; res.state = 'standing'; }
-            }
-            return res;
-        }
+    // 画方块
+    ctx.fillStyle = "#f1c40f";
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = "rgba(241, 196, 15, 0.4)";
+    ctx.fillRect(block.x1 * TILE + ox + 4, block.y1 * TILE + oy + 4, TILE - 8, TILE - 8);
+    if (block.state !== "standing") {
+        ctx.fillRect(block.x2 * TILE + ox + 4, block.y2 * TILE + oy + 4, TILE - 8, TILE - 8);
+    }
+}
 
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const ox = (canvas.width - COLS * TILE_SIZE) / 2;
-            const oy = (canvas.height - ROWS * TILE_SIZE) / 2;
+// 4. 游戏规则检测
+function check() {
+    const isVoid = (x, y) => x < 0 || x >= COLS || y < 0 || y >= ROWS || map[y][x] === 0;
 
-            for(let y=0; y<ROWS; y++) {
-                for(let x=0; x<COLS; x++) {
-                    if (map[y][x] === 0) continue;
-                    ctx.fillStyle = (map[y][x] === 2) ? '#e74c3c' : '#34495e';
-                    ctx.fillRect(x*TILE_SIZE + ox, y*TILE_SIZE + oy, TILE_SIZE-2, TILE_SIZE-2);
-                }
-            }
+    if (isVoid(block.x1, block.y1) || (block.state !== "standing" && isVoid(block.x2, block.y2))) {
+        end("坠落！", "#e74c3c");
+    } else if (block.state === "standing" && map[block.y1][block.x1] === 2) {
+        end("完美达成！", "#2ecc71");
+    }
+}
 
-            if (!gameOver) {
-                ctx.fillStyle = '#f1c40f';
-                ctx.fillRect(block.x * TILE_SIZE + ox + 4, block.y * TILE_SIZE + oy + 4, TILE_SIZE-10, TILE_SIZE-10);
-                if (block.state !== 'standing') {
-                    ctx.fillRect(block.x2 * TILE_SIZE + ox + 4, block.y2 * TILE_SIZE + oy + 4, TILE_SIZE-10, TILE_SIZE-10);
-                }
-            }
-        }
+function end(t, c) {
+    gameOver = true;
+    msg.textContent = t;
+    msg.style.color = c;
+    setTimeout(start, 1200);
+}
 
-        function check() {
-            const out = (x,y) => x<0 || x>=COLS || y<0 || y>=ROWS || map[y][x]===0;
-            if (out(block.x, block.y) || (block.state!=='standing' && out(block.x2, block.y2))) {
-                endGame("FELL INTO ABYSS!", "#e74c3c");
-            } else if (block.state==='standing' && map[block.y][block.x]===2) {
-                endGame("PERFECT! LEVEL CLEARED", "#2ecc71");
-            }
-        }
+function start() {
+    msg.textContent = "";
+    gameOver = false;
+    generateMap();
+    draw();
+}
 
-        function endGame(m, color) {
-            gameOver = true;
-            msgDiv.textContent = m;
-            msgDiv.style.color = color;
-            setTimeout(() => {
-                msgDiv.textContent = "";
-                start();
-            }, 1500);
-        }
+// 5. 事件监听
+window.addEventListener("keydown", e => {
+    if (gameOver) return;
+    const keyMap = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down" };
+    if (keyMap[e.key]) {
+        e.preventDefault();
+        block = simulate(block, keyMap[e.key]);
+        check();
+        draw();
+    }
+    if (e.key.toLowerCase() === 'r') start();
+});
 
-        function start() {
-            gameOver = false;
-            generateSolvableMap();
-            draw();
-        }
+window.onload = () => {
+    canvas.width = window.innerWidth * 0.95;
+    canvas.height = window.innerHeight * 0.8;
+    start();
+};
 
-        window.addEventListener('keydown', e => {
-            if (gameOver) return;
-            const dMap = { ArrowLeft:'left', ArrowRight:'right', ArrowUp:'up', ArrowDown:'down' };
-            if (dMap[e.key]) {
-                block = simulateMove({x1:block.x, y1:block.y, x2:block.x2, y2:block.y2, state:block.state}, dMap[e.key]);
-                // Sync internal structure
-                block.x = block.x1; block.y = block.y1;
-                check();
-                draw();
-            }
-            if (e.key.toLowerCase() === 'r') start();
-        });
-
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        start();
-    </script>
+window.onresize = () => {
+    canvas.width = window.innerWidth * 0.95;
+    canvas.height = window.innerHeight * 0.8;
+    draw();
+};
+</script>
 </body>
 </html>
