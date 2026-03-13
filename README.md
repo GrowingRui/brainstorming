@@ -36,6 +36,8 @@ Move box -> Currently unavailable
 
 Snake -> https://growingrui.github.io/brainstorming/snake
 
+Restaurant  https://growingrui.github.io/brainstorming/rest
+
 
 
 ## About
