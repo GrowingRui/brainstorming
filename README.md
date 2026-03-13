@@ -32,7 +32,7 @@ Memory-Match-Challenge -> https://growingrui.github.io/brainstorming/Memory-Matc
 
 Maze -> https://growingrui.github.io/brainstorming/Shadow-Maze
 
-Move box -> https://growingrui.github.io/brainstorming/Sokoban
+Move box -> Currently unavailable
 
 Snake -> https://growingrui.github.io/brainstorming/snake
 
