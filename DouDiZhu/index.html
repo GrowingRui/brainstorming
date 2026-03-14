@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>斗地主专业版 - 15s限时</title>
+    <style>
+        :root { --card-bg: #fff; --card-selected: #e0f7fa; --table-color: #1b5e20; }
+        body { background: #222; font-family: "Microsoft YaHei", sans-serif; margin: 0; overflow: hidden; color: white; }
+        #game-table { width: 100vw; height: 100vh; background: var(--table-color); position: relative; display: flex; flex-direction: column; }
+        
+        .info-bar { height: 60px; background: rgba(0,0,0,0.5); display: flex; justify-content: space-around; align-items: center; border-bottom: 2px solid rgba(255,255,255,0.1); }
+        .dipai { display: flex; gap: 8px; }
+        .mini-card { width: 35px; height: 50px; background: white; color: black; border-radius: 4px; text-align: center; line-height: 50px; font-weight: bold; font-size: 14px; }
+
+        .play-area { flex: 1; position: relative; }
+        .player-hand { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; height: 120px; align-items: flex-end; }
+        .ai-side { position: absolute; top: 80px; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); }
+        #ai1 { left: 30px; } #ai2 { right: 30px; }
+
+        .timer-container { position: absolute; bottom: 160px; left: 50%; transform: translateX(-50%); width: 200px; height: 10px; background: #444; border-radius: 5px; overflow: hidden; display: none; }
+        #timer-bar { height: 100%; width: 100%; background: #ffeb3b; transition: width 1s linear; }
+
+        .card { 
+            width: 80px; height: 120px; background: var(--card-bg); border: 1px solid #666; 
+            border-radius: 8px; color: black; display: flex; flex-direction: column; 
+            justify-content: space-between; padding: 8px; cursor: pointer; 
+            user-select: none; transition: transform 0.1s; box-shadow: 2px 2px 8px rgba(0,0,0,0.4); margin-left: -45px;
+        }
+        .card:first-child { margin-left: 0; }
+        .card.selected { transform: translateY(-30px); background: var(--card-selected); z-index: 100; }
+        .card.red { color: #d32f2f; }
+        
+        .desk { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%); display: flex; gap: 5px; min-height: 120px; }
+        
+        .controls { position: absolute; bottom: 200px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; }
+        button { padding: 12px 30px; font-size: 18px; cursor: pointer; border: none; border-radius: 6px; background: #ff9800; color: white; font-weight: bold; }
+        button:disabled { background: #555; cursor: not-allowed; }
+
+        #log { position: absolute; bottom: 10px; right: 10px; width: 260px; height: 150px; background: rgba(0,0,0,0.6); font-size: 13px; overflow-y: auto; padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+<div id="game-table">
+    <div class="info-bar">
+        <div>身份: <span id="my-role">地主</span></div>
+        <div class="dipai" id="dipai-area"></div>
+        <div>轮到: <b id="current-turn">-</b></div>
+    </div>
+
+    <div class="play-area">
+        <div id="ai1" class="ai-side">AI 1 (左) <br>剩余: <b id="count1">17</b></div>
+        <div id="ai2" class="ai-side">AI 2 (右) <br>剩余: <b id="count2">17</b></div>
+        
+        <div class="desk" id="desk-cards"></div>
+
+        <div class="timer-container" id="timer-ui"><div id="timer-bar"></div></div>
+
+        <div class="controls" id="btn-group" style="display:none">
+            <button onclick="game.playCards()">出牌</button>
+            <button onclick="game.passTurn()">不出</button>
+        </div>
+        
+        <div class="player-hand" id="player-cards"></div>
+    </div>
+
+    <div id="log"></div>
+    <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%)" id="start-screen">
+        <button onclick="game.init()">开始游戏</button>
+    </div>
+</div>
+
+<script>
+const VALUES = {'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14,'2':15,'小王':16,'大王':17};
+
+class Game {
+    constructor() {
+        this.players = [[], [], []];
+        this.turn = 0;
+        this.lastMove = { playerIdx: -1, cards: [] }; 
+        this.selectedIndices = new Set();
+        this.timer = null;
+        this.timeLeft = 15;
+    }
+
+    log(msg) {
+        const l = document.getElementById('log');
+        l.innerHTML += `<div>${msg}</div>`;
+        l.scrollTop = l.scrollHeight;
+    }
+
+    init() {
+        document.getElementById('start-screen').style.display = 'none';
+        let deck = [];
+        for (let n in VALUES) {
+            if (n.includes('王')) deck.push({ name: n, val: VALUES[n], red: n==='大王' });
+            else ['♠','♥','♣','♦'].forEach(s => deck.push({ name:n, val:VALUES[n], suit:s, red:(s==='♥'||s==='♦') }));
+        }
+        deck.sort(() => Math.random() - 0.5);
+        this.players = [deck.slice(0, 20), deck.slice(20, 37), deck.slice(37, 54)];
+        this.dipai = deck.slice(0, 3); // 简化逻辑
+        this.players.forEach((_, i) => this.sortHand(i));
+        this.renderDipai();
+        this.renderPlayerCards();
+        this.startTurn();
+    }
+
+    sortHand(idx) { this.players[idx].sort((a, b) => b.val - a.val); }
+
+    renderPlayerCards() {
+        const container = document.getElementById('player-cards');
+        container.innerHTML = '';
+        this.players[0].forEach((card, index) => {
+            const div = document.createElement('div');
+            div.className = `card ${card.red ? 'red' : ''} ${this.selectedIndices.has(index) ? 'selected' : ''}`;
+            div.innerHTML = `<div>${card.name}</div><div style="font-size:24px">${card.suit || ''}</div>`;
+            div.onclick = () => {
+                if (this.selectedIndices.has(index)) this.selectedIndices.delete(index);
+                else this.selectedIndices.add(index);
+                this.renderPlayerCards();
+            };
+            container.appendChild(div);
+        });
+        document.getElementById('count1').innerText = this.players[1].length;
+        document.getElementById('count2').innerText = this.players[2].length;
+    }
+
+    renderDipai() {
+        const area = document.getElementById('dipai-area');
+        area.innerHTML = '';
+        this.dipai.forEach(c => area.innerHTML += `<div class="mini-card ${c.red?'red':''}">${c.name}</div>`);
+    }
+
+    startTurn() {
+        clearInterval(this.timer);
+        document.getElementById('current-turn').innerText = this.turn === 0 ? "玩家" : `AI ${this.turn}`;
+        
+        if (this.turn === 0) {
+            document.getElementById('btn-group').style.display = 'flex';
+            this.startTimer();
+        } else {
+            document.getElementById('btn-group').style.display = 'none';
+            document.getElementById('timer-ui').style.display = 'none';
+            setTimeout(() => this.aiPlay(), 1000);
+        }
+    }
+
+    startTimer() {
+        this.timeLeft = 15;
+        const ui = document.getElementById('timer-ui');
+        const bar = document.getElementById('timer-bar');
+        ui.style.display = 'block';
+        bar.style.width = '100%';
+        
+        this.timer = setInterval(() => {
+            this.timeLeft--;
+            bar.style.width = (this.timeLeft / 15 * 100) + '%';
+            if (this.timeLeft <= 0) {
+                clearInterval(this.timer);
+                this.autoHandleTimeout();
+            }
+        }, 1000);
+    }
+
+    autoHandleTimeout() {
+        this.log("<span style='color:red'>时间到！自动操作</span>");
+        if (this.lastMove.playerIdx === -1 || this.lastMove.playerIdx === 0) {
+            // 首出超时，随便出一张最小的
+            this.selectedIndices.clear();
+            this.selectedIndices.add(this.players[0].length - 1);
+            this.playCards();
+        } else {
+            this.passTurn();
+        }
+    }
+
+    analyze(cards) {
+        if (!cards || cards.length === 0) return null;
+        const v = cards.map(c => c.val).sort((a,b) => a - b);
+        const len = v.length;
+        const counts = {};
+        v.forEach(x => counts[x] = (counts[x] || 0) + 1);
+        const freq = Object.entries(counts).map(([val, count]) => ({ val: parseInt(val), count })).sort((a,b) => b.count - a.count || b.val - a.val);
+
+        if (len === 1) return { type: 'single', power: v[0] };
+        if (len === 2) {
+            if (v[0] === v[1]) return { type: 'pair', power: v[0] };
+            if (v[0] === 16 && v[1] === 17) return { type: 'rocket', power: 999 };
+        }
+        if (len === 3 && freq[0].count === 3) return { type: 'three', power: freq[0].val }; // 三张
+        if (len === 4) {
+            if (freq[0].count === 4) return { type: 'bomb', power: freq[0].val };
+            if (freq[0].count === 3) return { type: 'three_one', power: freq[0].val };
+        }
+        if (len === 5 && freq[0].count === 3 && freq[1].count === 2) {
+            return { type: 'three_two', power: freq[0].val }; // 三带二
+        }
+        // 顺子判断
+        if (len >= 5 && v[len-1] < 15 && new Set(v).size === len && (v[len-1] - v[0] === len - 1)) {
+            return { type: 'straight', power: v[0], len: len };
+        }
+        return null;
+    }
+
+    playCards() {
+        const selected = Array.from(this.selectedIndices).map(i => this.players[0][i]);
+        const move = this.analyze(selected);
+
+        if (!move) return alert("牌型无效");
+
+        if (this.lastMove.playerIdx !== -1 && this.lastMove.playerIdx !== 0) {
+            const last = this.analyze(this.lastMove.cards);
+            if (move.type === 'rocket') {} 
+            else if (move.type === 'bomb' && last.type !== 'bomb') {}
+            else if (move.type !== last.type || (move.len && move.len !== last.len) || move.power <= last.power) {
+                return alert("压不住上家");
+            }
+        }
+
+        this.executeMove(0, selected);
+        this.selectedIndices.clear();
+        this.renderPlayerCards();
+    }
+
+    passTurn() {
+        if (this.lastMove.playerIdx === -1 || this.lastMove.playerIdx === 0) return alert("必须首出");
+        this.log("玩家: 不出");
+        this.nextTurn();
+    }
+
+    executeMove(playerIdx, cards) {
+        this.lastMove = { playerIdx, cards };
+        cards.forEach(c => {
+            const i = this.players[playerIdx].findIndex(p => p.val === c.val && (p.suit === c.suit || !c.suit));
+            this.players[playerIdx].splice(i, 1);
+        });
+
+        const desk = document.getElementById('desk-cards');
+        desk.innerHTML = '';
+        cards.forEach(c => desk.innerHTML += `<div class="card ${c.red?'red':''}">${c.name}</div>`);
+
+        this.log(`P${playerIdx || '你'}: ${cards.map(c=>c.name).join(' ')}`);
+        
+        if (this.players[playerIdx].length === 0) {
+            alert(playerIdx === 0 ? "胜！" : "负！");
+            location.reload();
+            return;
+        }
+        this.nextTurn();
+    }
+
+    nextTurn() {
+        this.turn = (this.turn + 1) % 3;
+        // 如果一圈走完，所有人都不出（或者是我刚出的没人压），则我是新的首出
+        if (this.lastMove.playerIdx === this.turn) {
+            this.lastMove = { playerIdx: -1, cards: [] }; 
+            document.getElementById('desk-cards').innerHTML = '<small>新一轮开始，请自由出牌</small>';
+        }
+        this.startTurn();
+    }
+
+    aiPlay() {
+        const hand = this.players[this.turn];
+        let toPlay = [];
+        if (this.lastMove.playerIdx === -1 || this.lastMove.playerIdx === this.turn) {
+            toPlay = [hand[hand.length - 1]]; // 自由出牌，AI出最小单张
+        } else {
+            const last = this.analyze(this.lastMove.cards);
+            if (last.type === 'single') {
+                const b = hand.find(c => c.val > last.power);
+                if (b) toPlay = [b];
+            } else if (last.type === 'pair') {
+                for(let i=hand.length-1; i>0; i--) {
+                    if(hand[i].val === hand[i-1].val && hand[i].val > last.power) {
+                        toPlay = [hand[i], hand[i-1]]; break;
+                    }
+                }
+            }
+        }
+
+        if (toPlay.length > 0) this.executeMove(this.turn, toPlay);
+        else { this.log(`AI ${this.turn}: 不出`); this.nextTurn(); }
+    }
+}
+const game = new Game();
+</script>
+</body>
+</html>
