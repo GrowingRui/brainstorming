@@ -26,13 +26,13 @@ Please note: 📍 Location services need to be enabled for the app What2wear to 
 
 Spaceship -> https://growingrui.github.io/brainstorming/Spaceship-adventure
 
-CyberRun -> Currently unavailable
+CyberRun -> https://growingrui.github.io/brainstorming/Cyber-Run
 
 Memory-Match-Challenge -> https://growingrui.github.io/brainstorming/Memory-Match-Challenge
 
 Maze -> https://growingrui.github.io/brainstorming/Shadow-Maze
 
-Move box -> Currently unavailable
+Move box -> https://growingrui.github.io/brainstorming/Sokoban
 
 Snake -> https://growingrui.github.io/brainstorming/snake
 
