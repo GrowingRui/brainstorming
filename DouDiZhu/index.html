@@ -23,11 +23,28 @@
         #timer-text { font-size: 22px; font-weight: bold; color: #ffeb3b; text-shadow: 1px 1px 2px #000; }
         .timer-progress { width: 100%; height: 6px; background: #444; border-radius: 3px; overflow: hidden; margin-top: 5px; }
         #timer-bar { height: 100%; width: 100%; background: #ffeb3b; transition: width 1s linear; }
-        .card { width: 80px; height: 120px; background: var(--card-bg); border: 1px solid #666; border-radius: 8px; color: black; display: flex; flex-direction: column; justify-content: space-between; padding: 8px; cursor: pointer; user-select: none; transition: transform 0.1s; box-shadow: 2px 2px 8px rgba(0,0,0,0.4); margin-left: -48px; }
+        
+        /* 扑克牌动画基础 */
+        .card { 
+            width: 80px; height: 120px; background: var(--card-bg); border: 1px solid #666; 
+            border-radius: 8px; color: black; display: flex; flex-direction: column; 
+            justify-content: space-between; padding: 8px; cursor: pointer; user-select: none; 
+            transition: transform 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28), box-shadow 0.2s; 
+            box-shadow: 2px 2px 8px rgba(0,0,0,0.4); margin-left: -48px; 
+            position: relative;
+        }
         .card:first-child { margin-left: 0; }
-        .card.selected { transform: translateY(-30px); background: var(--card-selected); z-index: 100; }
+        .card.selected { transform: translateY(-30px); background: var(--card-selected); z-index: 100; box-shadow: 0 10px 20px rgba(0,0,0,0.6); }
         .card.red { color: #d32f2f; }
+        
+        /* 出牌动画 */
+        @keyframes playCardAnim {
+            0% { transform: scale(1.2) translateY(50px); opacity: 0; }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
         .desk { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%); display: flex; gap: 5px; min-height: 120px; }
+        .desk .card { margin-left: 0; animation: playCardAnim 0.3s ease-out forwards; pointer-events: none; }
+
         .controls { position: absolute; bottom: 210px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; }
         button { padding: 12px 35px; font-size: 18px; cursor: pointer; border: none; border-radius: 6px; background: #ff9800; color: white; font-weight: bold; box-shadow: 0 4px 0 #e68a00; }
         button:active { transform: translateY(2px); box-shadow: 0 2px 0 #e68a00; }
@@ -67,6 +84,26 @@
 <script>
 const VALUES={'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14,'2':15,'小王':16,'大王':17};
 
+// 简单的音频合成器
+const sound = {
+    ctx: new (window.AudioContext || window.webkitAudioContext)(),
+    play(freq, type, duration) {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+        gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + duration);
+    },
+    click() { this.play(600, 'sine', 0.1); },
+    playCard() { this.play(400, 'square', 0.15); },
+    newTurn() { this.play(800, 'sine', 0.2); }
+};
+
 class Game{
     constructor(){this.resetState();}
     resetState(){
@@ -75,6 +112,7 @@ class Game{
     }
     log(msg){const l=document.getElementById('log'); l.innerHTML+=`<div>${msg}</div>`; l.scrollTop=l.scrollHeight;}
     exitGame(){if(confirm("确定要退出吗？")) location.reload();}
+    
     init(){
         this.resetState();
         document.getElementById('start-screen').style.display='none';
@@ -110,7 +148,12 @@ class Game{
             const div=document.createElement('div');
             div.className=`card ${card.red?'red':''} ${this.selectedIndices.has(index)?'selected':''}`;
             div.innerHTML=`<div>${card.name}</div><div style="font-size:24px">${card.suit||''}</div>`;
-            div.onclick=()=>{if(this.selectedIndices.has(index)) this.selectedIndices.delete(index); else this.selectedIndices.add(index); this.renderPlayerCards();};
+            div.onclick=()=>{
+                sound.click();
+                if(this.selectedIndices.has(index)) this.selectedIndices.delete(index); 
+                else this.selectedIndices.add(index); 
+                this.renderPlayerCards();
+            };
             container.appendChild(div);
         });
         document.getElementById('count1').innerText=this.players[1].length;
@@ -127,7 +170,7 @@ class Game{
         } else{
             document.getElementById('btn-group').style.display='none';
             document.getElementById('timer-ui').style.display='none';
-            setTimeout(()=>this.aiPlay(),1200);
+            setTimeout(()=>this.aiPlay(), 1200);
         }
     }
     startTimer(){
@@ -140,6 +183,7 @@ class Game{
     updateTimerUI(){document.getElementById('timer-text').innerText=this.timeLeft+'s'; document.getElementById('timer-bar').style.width=(this.timeLeft/15*100)+'%';}
     autoHandleTimeout(){if(this.lastMove.playerIdx===-1||this.lastMove.playerIdx===0){this.selectedIndices.clear(); this.selectedIndices.add(this.players[0].length-1); this.playCards();}
     else this.passTurn();}
+    
     analyze(cards){
         if(!cards||cards.length===0) return null;
         const v=cards.map(c=>c.val).sort((a,b)=>a-b), len=v.length, counts={};
@@ -156,6 +200,7 @@ class Game{
         if(len===5&&freq[0].count===3&&freq[1].count===2) return {type:'three_two',power:freq[0].val};
         if(len>=5&&v[len-1]<15&&new Set(v).size===len&&(v[len-1]-v[0]===len-1)) return {type:'straight',power:v[0],len};
         if(len>=6&&len%2===0&&freq.every(f=>f.count===2)&&uniqueValues[uniqueValues.length-1]<15&&(uniqueValues[uniqueValues.length-1]-uniqueValues[0]===uniqueValues.length-1)) return {type:'double_straight',power:uniqueValues[0],len:len/2};
+        
         const threes=freq.filter(f=>f.count>=3).map(f=>f.val).sort((a,b)=>a-b);
         if(threes.length>=2){
             for(let i=0;i<=threes.length-2;i++){
@@ -169,10 +214,11 @@ class Game{
                 }
             }
         }
-        if(len===6&&freq[0].count===4&&(freq[1].count===2||freq[1].count===1&&freq[2]&&freq[2].count===1)) return {type:'four_two',power:freq[0].val};
+        if(len===6&&freq[0].count===4) return {type:'four_two',power:freq[0].val};
         if(len===8&&freq[0].count===4&&freq[1].count===2&&freq[2].count===2) return {type:'four_two_pairs',power:freq[0].val};
         return null;
     }
+
     playCards(){
         const selected=Array.from(this.selectedIndices).map(i=>this.players[0][i]);
         const move=this.analyze(selected);
@@ -190,51 +236,109 @@ class Game{
         this.renderPlayerCards();
     }
     passTurn(){this.log("玩家: 不出"); this.nextTurn();}
+
     executeMove(playerIdx,cards,analysis){
+        sound.playCard();
         this.lastMove={playerIdx,cards,analysis};
         cards.forEach(c=>{const i=this.players[playerIdx].findIndex(p=>p.val===c.val&&(p.suit===c.suit||!c.suit)); this.players[playerIdx].splice(i,1);});
-        const desk=document.getElementById('desk-cards'); desk.innerHTML='';
-        cards.sort((a,b)=>b.val-a.val).forEach(c=>desk.innerHTML+=`<div class="card ${c.red?'red':''}">${c.name}</div>`);
+        
+        const desk=document.getElementById('desk-cards'); 
+        desk.innerHTML='';
+        // 渲染桌面牌并应用动画
+        cards.sort((a,b)=>b.val-a.val).forEach((c, idx)=>{
+            const cardDiv = document.createElement('div');
+            cardDiv.className = `card ${c.red?'red':''}`;
+            cardDiv.style.animationDelay = (idx * 0.05) + 's';
+            cardDiv.innerHTML = `<div>${c.name}</div><div style="font-size:24px">${c.suit||''}</div>`;
+            desk.appendChild(cardDiv);
+        });
+
         this.log(`P${playerIdx||'你'}: ${cards.map(c=>c.name).join('')} (${analysis.type})`);
         if(this.players[playerIdx].length===0){setTimeout(()=>{alert((playerIdx===this.landlordIdx)?"地主获胜！":"农民获胜！"); location.reload();},500); return;}
         this.nextTurn();
     }
+
     nextTurn(){
         this.turn=(this.turn+1)%3;
-        if(this.lastMove.playerIdx===this.turn){this.lastMove={playerIdx:-1,cards:[],analysis:null};
-        setTimeout(()=>{document.getElementById('desk-cards').innerHTML='<span style="color:#ffd54f">新回合开始</span>';},500);}
+        if(this.lastMove.playerIdx===this.turn){
+            this.lastMove={playerIdx:-1,cards:[],analysis:null};
+            setTimeout(()=>{
+                sound.newTurn();
+                document.getElementById('desk-cards').innerHTML='<span style="color:#ffd54f">新回合开始</span>';
+            },500);
+        }
         this.startTurn();
     }
+
     aiPlay(){
         const hand=[...this.players[this.turn]].sort((a,b)=>a.val-b.val);
         let toPlay=null;
+        const allMoves=this.generateAllMoves(hand);
+
         if(this.lastMove.playerIdx===-1||this.lastMove.playerIdx===this.turn){
-            // 首出
-            const pairs=this.findPairs(hand); if(pairs.length>0) toPlay=[pairs[0].c1,pairs[0].c2]; else toPlay=[hand[0]];
+            // AI首出：优先选权重高的出（如单张、对子）
+            toPlay = allMoves.sort((a,b) => a.weight - b.weight)[0].cards;
         } else{
             const last=this.lastMove.analysis;
-            const allMoves=this.generateAllMoves(hand);
-            // 找最小能压上家
+            // 找最小能压上家的牌，且不破坏炸弹（除非只有炸弹能压）
             const better=allMoves.filter(m=>{
                 if(last.type==='rocket') return false;
                 if(m.type==='rocket') return true;
                 if(m.type==='bomb'&&last.type!=='bomb'&&last.type!=='rocket') return true;
                 return m.type===last.type&&(m.len||0)===(last.len||0)&&m.power>last.power;
-            }).sort((a,b)=>a.power-b.power);
+            }).sort((a,b)=>a.weight - b.weight || a.power - b.power);
+            
             if(better.length>0) toPlay=better[0].cards;
         }
         if(toPlay){const analysis=this.analyze(toPlay); this.executeMove(this.turn,toPlay,analysis);}
         else{this.log(`AI ${this.turn}: 不出`); this.nextTurn();}
         this.renderPlayerCards();
     }
-    findPairs(hand){let pairs=[]; for(let i=0;i<hand.length-1;i++){if(hand[i].val===hand[i+1].val){pairs.push({val:hand[i].val,c1:hand[i],c2:hand[i+1]}); i++;}} return pairs;}
+
+    // AI出牌生成逻辑，包含权重系统防止拆散大牌
     generateAllMoves(hand){
-        // 简单生成单张/对子/三张/炸弹/顺子/连对
         const moves=[];
-        hand.forEach(c=>moves.push({cards:[c],type:'single',power:c.val}));
-        for(let i=0;i<hand.length-1;i++){if(hand[i].val===hand[i+1].val) moves.push({cards:[hand[i],hand[i+1]],type:'pair',power:hand[i].val});}
-        for(let i=0;i<hand.length-2;i++){if(hand[i].val===hand[i+1].val&&hand[i].val===hand[i+2].val) moves.push({cards:[hand[i],hand[i+1],hand[i+2]],type:'three',power:hand[i].val});}
-        const freq={}; hand.forEach(c=>freq[c.val]=(freq[c.val]||0)+1); Object.entries(freq).forEach(([v,c])=>{if(c===4){const cards=hand.filter(h=>h.val==v); moves.push({cards,type:'bomb',power:parseInt(v)});}});
+        const freq={}; hand.forEach(c=>freq[c.val]=(freq[c.val]||0)+1);
+        
+        // 找出所有炸弹和王炸（权重最高，最后考虑）
+        const bombs = Object.keys(freq).filter(v => freq[v] === 4);
+        const hasRocket = hand.find(c=>c.val===16) && hand.find(c=>c.val===17);
+
+        // 生成单张
+        hand.forEach(c => {
+            let weight = c.val;
+            if(bombs.includes(c.val.toString())) weight += 100; // 拆炸弹权重极高
+            if((c.val === 16 || c.val === 17) && hasRocket) weight += 200; // 拆王炸权重最高
+            moves.push({cards:[c], type:'single', power:c.val, weight: weight});
+        });
+
+        // 生成对子
+        for(let i=0;i<hand.length-1;i++){
+            if(hand[i].val===hand[i+1].val) {
+                let weight = hand[i].val;
+                if(bombs.includes(hand[i].val.toString())) weight += 100;
+                moves.push({cards:[hand[i],hand[i+1]], type:'pair', power:hand[i].val, weight: weight});
+            }
+        }
+
+        // 生成三张
+        for(let i=0;i<hand.length-2;i++){
+            if(hand[i].val===hand[i+1].val && hand[i].val===hand[i+2].val) {
+                moves.push({cards:[hand[i],hand[i+1],hand[i+2]], type:'three', power:hand[i].val, weight: hand[i].val});
+            }
+        }
+
+        // 生成炸弹
+        bombs.forEach(v => {
+            const cards = hand.filter(h => h.val == v);
+            moves.push({cards, type:'bomb', power:parseInt(v), weight: 50 + parseInt(v)}); // 炸弹权重设为中等，优先出小牌
+        });
+
+        // 生成王炸
+        if(hasRocket) {
+            moves.push({cards: hand.filter(c=>c.val>=16), type:'rocket', power:999, weight: 300});
+        }
+
         return moves;
     }
 }
