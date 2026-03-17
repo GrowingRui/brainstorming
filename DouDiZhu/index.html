@@ -7,24 +7,31 @@
         :root { --card-bg: #fff; --card-selected: #e0f7fa; --table-color: #1b5e20; }
         body { background: #222; font-family: "Microsoft YaHei", sans-serif; margin: 0; overflow: hidden; color: white; }
         #game-table { width: 100vw; height: 100vh; background: var(--table-color); position: relative; display: flex; flex-direction: column; }
-        .info-bar { height: 60px; background: rgba(0,0,0,0.5); display: flex; justify-content: space-around; align-items: center; border-bottom: 2px solid rgba(255,255,255,0.1); }
+        
+        /* 顶栏 */
+        .info-bar { height: 60px; background: rgba(0,0,0,0.5); display: flex; justify-content: space-around; align-items: center; border-bottom: 2px solid rgba(255,255,255,0.1); z-index: 10; }
         .dipai { display: flex; gap: 8px; }
         .mini-card { width: 35px; height: 50px; background: white; color: black; border-radius: 4px; text-align: center; line-height: 50px; font-weight: bold; font-size: 14px; }
         .exit-link { position: absolute; top: 15px; right: 20px; color: #ff5252; text-decoration: none; font-weight: bold; cursor: pointer; z-index: 1000; font-size: 16px; border: 1px solid #ff5252; padding: 5px 15px; border-radius: 4px; background: rgba(0,0,0,0.2); }
         .exit-link:hover { background: #ff5252; color: white; }
+        
         .play-area { flex: 1; position: relative; }
-        .player-hand { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; height: 120px; align-items: flex-end; }
-        .ai-side { position: absolute; top: 80px; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 8px; }
+        
+        /* 手牌区域：提高层级，确保在日志框之上 */
+        .player-hand { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; height: 120px; align-items: flex-end; z-index: 50; }
+        
+        .ai-side { position: absolute; top: 80px; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 8px; z-index: 5; }
         #ai1 { left: 30px; } #ai2 { right: 30px; }
         .role-tag { font-size: 12px; padding: 2px 6px; border-radius: 3px; margin-left: 5px; font-weight: bold; }
         .tag-dizhu { background: #f44336; color: #fff; }
         .tag-nongmin { background: #2196f3; color: #fff; }
+        
         .timer-container { position: absolute; bottom: 160px; left: 50%; transform: translateX(-50%); width: 200px; text-align: center; display: none; }
         #timer-text { font-size: 22px; font-weight: bold; color: #ffeb3b; text-shadow: 1px 1px 2px #000; }
         .timer-progress { width: 100%; height: 6px; background: #444; border-radius: 3px; overflow: hidden; margin-top: 5px; }
         #timer-bar { height: 100%; width: 100%; background: #ffeb3b; transition: width 1s linear; }
         
-        /* 扑克牌动画基础 */
+        /* 扑克牌 */
         .card { 
             width: 80px; height: 120px; background: var(--card-bg); border: 1px solid #666; 
             border-radius: 8px; color: black; display: flex; flex-direction: column; 
@@ -45,17 +52,29 @@
         .desk { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%); display: flex; gap: 5px; min-height: 120px; }
         .desk .card { margin-left: 0; animation: playCardAnim 0.3s ease-out forwards; pointer-events: none; }
 
-        .controls { position: absolute; bottom: 210px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; }
+        .controls { position: absolute; bottom: 210px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 60; }
         button { padding: 12px 35px; font-size: 18px; cursor: pointer; border: none; border-radius: 6px; background: #ff9800; color: white; font-weight: bold; box-shadow: 0 4px 0 #e68a00; }
         button:active { transform: translateY(2px); box-shadow: 0 2px 0 #e68a00; }
         button:disabled { background: #9e9e9e; box-shadow: 0 4px 0 #757575; cursor: not-allowed; }
-        #log { position: absolute; bottom: 10px; right: 10px; width: 260px; height: 150px; background: rgba(0,0,0,0.6); font-size: 13px; overflow-y: auto; padding: 10px; border-radius: 5px; border: 1px solid #444; }
+
+        /* 修复后的日志框：允许点击穿透 */
+        #log { 
+            position: absolute; bottom: 15px; right: 15px; width: 240px; height: 120px; 
+            background: rgba(0,0,0,0.6); font-size: 12px; overflow-y: auto; padding: 8px; 
+            border-radius: 5px; border: 1px solid #444; 
+            pointer-events: none; /* 关键：点击可穿透到下层牌 */
+            z-index: 20; 
+        }
+        #log div { pointer-events: auto; } /* 日志文字本身保留交互 */
+
+        .score-box { color: #ffeb3b; font-weight: bold; border: 1px inset rgba(255,255,255,0.3); padding: 2px 10px; border-radius: 15px; background: rgba(0,0,0,0.2); }
     </style>
 </head>
 <body>
 <div id="game-table">
     <div class="exit-link" onclick="game.exitGame()">退出游戏</div>
     <div class="info-bar">
+        <div>总分: <span id="total-score" class="score-box">0</span></div>
         <div>身份: <span id="my-role">-</span></div>
         <div class="dipai" id="dipai-area"></div>
         <div>回合: <b id="current-turn">-</b></div>
@@ -84,7 +103,7 @@
 <script>
 const VALUES={'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14,'2':15,'小王':16,'大王':17};
 
-// 简单的音频合成器
+// 音频系统
 const sound = {
     ctx: new (window.AudioContext || window.webkitAudioContext)(),
     play(freq, type, duration) {
@@ -105,7 +124,11 @@ const sound = {
 };
 
 class Game{
-    constructor(){this.resetState();}
+    constructor(){
+        this.score = parseInt(localStorage.getItem('ddz_score')) || 0;
+        this.resetState();
+        document.getElementById('total-score').innerText = this.score;
+    }
     resetState(){
         this.players=[[],[],[]]; this.landlordIdx=-1; this.turn=0; this.lastMove={playerIdx:-1,cards:[],analysis:null};
         this.selectedIndices=new Set(); this.timer=null; this.timeLeft=15;
@@ -140,6 +163,7 @@ class Game{
         const area=document.getElementById('dipai-area'); area.innerHTML='';
         this.dipai.forEach(c=>area.innerHTML+=`<div class="mini-card ${c.red?'red':''}">${c.name}</div>`);
         this.renderPlayerCards();
+        document.getElementById('total-score').innerText = this.score;
     }
     sortHand(idx){this.players[idx].sort((a,b)=>b.val-a.val);}
     renderPlayerCards(){
@@ -244,7 +268,6 @@ class Game{
         
         const desk=document.getElementById('desk-cards'); 
         desk.innerHTML='';
-        // 渲染桌面牌并应用动画
         cards.sort((a,b)=>b.val-a.val).forEach((c, idx)=>{
             const cardDiv = document.createElement('div');
             cardDiv.className = `card ${c.red?'red':''}`;
@@ -253,8 +276,23 @@ class Game{
             desk.appendChild(cardDiv);
         });
 
-        this.log(`P${playerIdx||'你'}: ${cards.map(c=>c.name).join('')} (${analysis.type})`);
-        if(this.players[playerIdx].length===0){setTimeout(()=>{alert((playerIdx===this.landlordIdx)?"地主获胜！":"农民获胜！"); location.reload();},500); return;}
+        this.log(`P${playerIdx||'你'}: ${cards.map(c=>c.name).join('')}`);
+        
+        if(this.players[playerIdx].length===0){
+            let scoreChange = 0;
+            const isLandlordWin = (playerIdx === this.landlordIdx);
+            if(this.landlordIdx === 0) scoreChange = isLandlordWin ? 20 : -20;
+            else scoreChange = isLandlordWin ? -10 : 10;
+            
+            this.score += scoreChange;
+            localStorage.setItem('ddz_score', this.score);
+            
+            setTimeout(()=>{
+                alert(`${isLandlordWin?"地主":"农民"}获胜！\n积分变动: ${scoreChange > 0 ? '+' : ''}${scoreChange}\n总分: ${this.score}`);
+                location.reload();
+            }, 500); 
+            return;
+        }
         this.nextTurn();
     }
 
@@ -276,18 +314,15 @@ class Game{
         const allMoves=this.generateAllMoves(hand);
 
         if(this.lastMove.playerIdx===-1||this.lastMove.playerIdx===this.turn){
-            // AI首出：优先选权重高的出（如单张、对子）
             toPlay = allMoves.sort((a,b) => a.weight - b.weight)[0].cards;
         } else{
             const last=this.lastMove.analysis;
-            // 找最小能压上家的牌，且不破坏炸弹（除非只有炸弹能压）
             const better=allMoves.filter(m=>{
                 if(last.type==='rocket') return false;
                 if(m.type==='rocket') return true;
                 if(m.type==='bomb'&&last.type!=='bomb'&&last.type!=='rocket') return true;
                 return m.type===last.type&&(m.len||0)===(last.len||0)&&m.power>last.power;
             }).sort((a,b)=>a.weight - b.weight || a.power - b.power);
-            
             if(better.length>0) toPlay=better[0].cards;
         }
         if(toPlay){const analysis=this.analyze(toPlay); this.executeMove(this.turn,toPlay,analysis);}
@@ -295,24 +330,19 @@ class Game{
         this.renderPlayerCards();
     }
 
-    // AI出牌生成逻辑，包含权重系统防止拆散大牌
     generateAllMoves(hand){
         const moves=[];
         const freq={}; hand.forEach(c=>freq[c.val]=(freq[c.val]||0)+1);
-        
-        // 找出所有炸弹和王炸（权重最高，最后考虑）
         const bombs = Object.keys(freq).filter(v => freq[v] === 4);
         const hasRocket = hand.find(c=>c.val===16) && hand.find(c=>c.val===17);
 
-        // 生成单张
         hand.forEach(c => {
             let weight = c.val;
-            if(bombs.includes(c.val.toString())) weight += 100; // 拆炸弹权重极高
-            if((c.val === 16 || c.val === 17) && hasRocket) weight += 200; // 拆王炸权重最高
+            if(bombs.includes(c.val.toString())) weight += 100;
+            if((c.val === 16 || c.val === 17) && hasRocket) weight += 200;
             moves.push({cards:[c], type:'single', power:c.val, weight: weight});
         });
 
-        // 生成对子
         for(let i=0;i<hand.length-1;i++){
             if(hand[i].val===hand[i+1].val) {
                 let weight = hand[i].val;
@@ -320,25 +350,17 @@ class Game{
                 moves.push({cards:[hand[i],hand[i+1]], type:'pair', power:hand[i].val, weight: weight});
             }
         }
-
-        // 生成三张
+        // ...三张、炸弹逻辑保持不变
         for(let i=0;i<hand.length-2;i++){
             if(hand[i].val===hand[i+1].val && hand[i].val===hand[i+2].val) {
                 moves.push({cards:[hand[i],hand[i+1],hand[i+2]], type:'three', power:hand[i].val, weight: hand[i].val});
             }
         }
-
-        // 生成炸弹
         bombs.forEach(v => {
             const cards = hand.filter(h => h.val == v);
-            moves.push({cards, type:'bomb', power:parseInt(v), weight: 50 + parseInt(v)}); // 炸弹权重设为中等，优先出小牌
+            moves.push({cards, type:'bomb', power:parseInt(v), weight: 50 + parseInt(v)});
         });
-
-        // 生成王炸
-        if(hasRocket) {
-            moves.push({cards: hand.filter(c=>c.val>=16), type:'rocket', power:999, weight: 300});
-        }
-
+        if(hasRocket) moves.push({cards: hand.filter(c=>c.val>=16), type:'rocket', power:999, weight: 300});
         return moves;
     }
 }
