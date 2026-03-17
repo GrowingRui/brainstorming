@@ -2,13 +2,12 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>单机斗地主</title>
+    <title>单机斗地主 - 随机分牌版</title>
     <style>
         :root { --card-bg: #fff; --card-selected: #e0f7fa; --table-color: #1b5e20; }
         body { background: #222; font-family: "Microsoft YaHei", sans-serif; margin: 0; overflow: hidden; color: white; }
         #game-table { width: 100vw; height: 100vh; background: var(--table-color); position: relative; display: flex; flex-direction: column; }
         
-        /* 顶栏 */
         .info-bar { height: 60px; background: rgba(0,0,0,0.5); display: flex; justify-content: space-around; align-items: center; border-bottom: 2px solid rgba(255,255,255,0.1); z-index: 10; }
         .dipai { display: flex; gap: 8px; }
         .mini-card { width: 35px; height: 50px; background: white; color: black; border-radius: 4px; text-align: center; line-height: 50px; font-weight: bold; font-size: 14px; }
@@ -16,8 +15,6 @@
         .exit-link:hover { background: #ff5252; color: white; }
         
         .play-area { flex: 1; position: relative; }
-        
-        /* 手牌区域：提高层级，确保在日志框之上 */
         .player-hand { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; height: 120px; align-items: flex-end; z-index: 50; }
         
         .ai-side { position: absolute; top: 80px; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 8px; z-index: 5; }
@@ -31,7 +28,6 @@
         .timer-progress { width: 100%; height: 6px; background: #444; border-radius: 3px; overflow: hidden; margin-top: 5px; }
         #timer-bar { height: 100%; width: 100%; background: #ffeb3b; transition: width 1s linear; }
         
-        /* 扑克牌 */
         .card { 
             width: 80px; height: 120px; background: var(--card-bg); border: 1px solid #666; 
             border-radius: 8px; color: black; display: flex; flex-direction: column; 
@@ -44,7 +40,6 @@
         .card.selected { transform: translateY(-30px); background: var(--card-selected); z-index: 100; box-shadow: 0 10px 20px rgba(0,0,0,0.6); }
         .card.red { color: #d32f2f; }
         
-        /* 出牌动画 */
         @keyframes playCardAnim {
             0% { transform: scale(1.2) translateY(50px); opacity: 0; }
             100% { transform: scale(1) translateY(0); opacity: 1; }
@@ -57,15 +52,14 @@
         button:active { transform: translateY(2px); box-shadow: 0 2px 0 #e68a00; }
         button:disabled { background: #9e9e9e; box-shadow: 0 4px 0 #757575; cursor: not-allowed; }
 
-        /* 修复后的日志框：允许点击穿透 */
         #log { 
             position: absolute; bottom: 15px; right: 15px; width: 240px; height: 120px; 
             background: rgba(0,0,0,0.6); font-size: 12px; overflow-y: auto; padding: 8px; 
             border-radius: 5px; border: 1px solid #444; 
-            pointer-events: none; /* 关键：点击可穿透到下层牌 */
+            pointer-events: none; 
             z-index: 20; 
         }
-        #log div { pointer-events: auto; } /* 日志文字本身保留交互 */
+        #log div { pointer-events: auto; }
 
         .score-box { color: #ffeb3b; font-weight: bold; border: 1px inset rgba(255,255,255,0.3); padding: 2px 10px; border-radius: 15px; background: rgba(0,0,0,0.2); }
     </style>
@@ -103,7 +97,6 @@
 <script>
 const VALUES={'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14,'2':15,'小王':16,'大王':17};
 
-// 音频系统
 const sound = {
     ctx: new (window.AudioContext || window.webkitAudioContext)(),
     play(freq, type, duration) {
@@ -143,9 +136,17 @@ class Game{
         let deck=[];
         for(let n in VALUES){if(n.includes('王')) deck.push({name:n,val:VALUES[n],red:n==='大王'});
         else ['♠','♥','♣','♦'].forEach(s=>deck.push({name:n,val:VALUES[n],suit:s,red:(s==='♥'||s==='♦')}));}
+        
+        // 洗牌：Fisher-Yates 算法变体
         deck.sort(()=>Math.random()-0.5);
-        this.players=[deck.slice(0,17),deck.slice(17,34),deck.slice(34,51)];
-        this.dipai=deck.slice(51);
+        
+        // 核心修改：分牌逻辑随机化（轮流抓牌模式）
+        const handCards = deck.slice(0, 51);
+        handCards.forEach((card, i) => {
+            this.players[i % 3].push(card);
+        });
+        this.dipai = deck.slice(51); // 最后3张做底牌
+
         this.landlordIdx=Math.floor(Math.random()*3);
         this.players[this.landlordIdx].push(...this.dipai);
         this.turn=this.landlordIdx;
@@ -350,7 +351,6 @@ class Game{
                 moves.push({cards:[hand[i],hand[i+1]], type:'pair', power:hand[i].val, weight: weight});
             }
         }
-        // ...三张、炸弹逻辑保持不变
         for(let i=0;i<hand.length-2;i++){
             if(hand[i].val===hand[i+1].val && hand[i].val===hand[i+2].val) {
                 moves.push({cards:[hand[i],hand[i+1],hand[i+2]], type:'three', power:hand[i].val, weight: hand[i].val});
