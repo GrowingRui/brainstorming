@@ -3,58 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>水果忍者 HTML5</title>
+    <title>水果忍者 - 舒适慢速版</title>
     <style>
         body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background: #222;
-            font-family: 'Arial', sans-serif;
-            touch-action: none; /* 防止移动端缩放和滚动 */
+            margin: 0; padding: 0; overflow: hidden;
+            background: #222; font-family: 'Microsoft YaHei', Arial, sans-serif;
+            touch-action: none; user-select: none;
         }
-        #gameCanvas {
-            display: block;
-            background: radial-gradient(circle, #4a3000 0%, #2b1d00 100%);
-        }
+        #gameCanvas { display: block; background: radial-gradient(circle, #4a3000 0%, #2b1d00 100%); }
         #ui {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            color: #fff;
-            font-size: 24px;
-            pointer-events: none;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            position: absolute; top: 20px; left: 20px; color: #fff;
+            font-size: 24px; pointer-events: none; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
         }
+        .heart { color: #ff4444; font-size: 30px; letter-spacing: 5px; }
         #gameOver {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #ff4444;
-            text-align: center;
-            display: none;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9); padding: 40px; border-radius: 20px;
+            border: 2px solid #666; color: white; text-align: center; display: none; min-width: 280px;
         }
+        #finalScore { font-size: 60px; color: #ffeb3b; margin: 15px 0; font-weight: bold; }
         button {
-            padding: 10px 20px;
-            font-size: 20px;
-            background: #44aa44;
-            color: white;
-            border: none;
-            cursor: pointer;
-            border-radius: 5px;
-            margin-top: 20px;
+            padding: 15px 40px; font-size: 22px; background: #44aa44;
+            color: white; border: none; cursor: pointer; border-radius: 50px;
+            box-shadow: 0 4px 0 #2d702d;
         }
+        button:active { transform: translateY(2px); box-shadow: 0 2px 0 #2d702d; }
     </style>
 </head>
 <body>
 
-    <div id="ui">得分: <span id="score">0</span></div>
+    <div id="ui">
+        <div>得分: <span id="score">0</span></div>
+        <div id="livesContainer">生命: <span class="heart">❤❤❤</span></div>
+    </div>
     
     <div id="gameOver">
-        <h1>游戏结束!</h1>
-        <p>切到了炸弹！</p>
-        <button onclick="resetGame()">重新开始</button>
+        <h2 id="overStatus">游戏结束</h2>
+        <p>最终得分</p>
+        <div id="finalScore">0</div>
+        <button onclick="resetGame()">再来一局</button>
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -63,20 +50,23 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const scoreEl = document.getElementById('score');
+    const livesEl = document.querySelector('.heart');
     const gameOverEl = document.getElementById('gameOver');
+    const finalScoreEl = document.getElementById('finalScore');
+    const overStatusEl = document.getElementById('overStatus');
 
-    let width, height, score, gameActive;
+    let width, height, score, lives, gameActive;
     let fruits = [];
     let particles = [];
-    let blade = []; // 存储切割轨迹轨迹
+    let blade = [];
     let lastSpawnTime = 0;
 
-    // 游戏配置
+    // --- 难度平衡参数 (慢速版) ---
     const CONFIG = {
-        gravity: 0.15,
-        spawnInterval: 1000, // 毫秒
+        gravity: 0.12,          // 降低重力 (原 0.18)
+        spawnInterval: 1600,    // 增加间隔 (原 1100)
         fruitColors: ['#ff4444', '#ffeb3b', '#4caf50', '#ff9800', '#9c27b0'],
-        bombColor: '#333'
+        bombColor: '#111'
     };
 
     function init() {
@@ -92,24 +82,32 @@
 
     function resetGame() {
         score = 0;
-        scoreEl.innerText = score;
+        lives = 3;
+        updateUI();
         fruits = [];
         particles = [];
         blade = [];
         gameActive = true;
         gameOverEl.style.display = 'none';
+        lastSpawnTime = performance.now();
+    }
+
+    function updateUI() {
+        scoreEl.innerText = score;
+        livesEl.innerText = "❤".repeat(Math.max(0, lives));
     }
 
     class GameObject {
         constructor(isBomb = false) {
             this.isBomb = isBomb;
-            this.radius = isBomb ? 30 : 35 + Math.random() * 15;
+            this.radius = isBomb ? 25 : 35 + Math.random() * 10;
             this.x = Math.random() * (width - 100) + 50;
             this.y = height + this.radius;
             
-            // 初始速度：向上喷射
-            this.vx = (Math.random() - 0.5) * 6;
-            this.vy = -(Math.random() * 5 + 10);
+            // 调整水平速度
+            this.vx = (this.x < width/2 ? 0.8 : -0.8) * (Math.random() * 2 + 0.5);
+            // 调整垂直向上喷射的速度 (慢速版)
+            this.vy = -(Math.sqrt(height) * (0.45 + Math.random() * 0.25)); 
             
             this.color = isBomb ? CONFIG.bombColor : CONFIG.fruitColors[Math.floor(Math.random() * CONFIG.fruitColors.length)];
             this.isSliced = false;
@@ -122,37 +120,38 @@
         }
 
         draw() {
+            ctx.save();
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
             ctx.fillStyle = this.color;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = 'rgba(0,0,0,0.3)';
             ctx.fill();
             
-            // 炸弹画个引信效果
             if (this.isBomb) {
-                ctx.strokeStyle = 'red';
-                ctx.lineWidth = 3;
+                // 绘制炸弹火花感
+                ctx.strokeStyle = "#ff4444";
+                ctx.lineWidth = 2;
                 ctx.stroke();
+                ctx.fillStyle = "white";
+                ctx.fillRect(this.x - 2, this.y - this.radius - 4, 4, 6);
             }
             ctx.closePath();
+            ctx.restore();
         }
     }
 
     class Particle {
         constructor(x, y, color) {
-            this.x = x;
-            this.y = y;
-            this.color = color;
-            this.vx = (Math.random() - 0.5) * 10;
-            this.vy = (Math.random() - 0.5) * 10;
+            this.x = x; this.y = y; this.color = color;
+            this.vx = (Math.random() - 0.5) * 8;
+            this.vy = (Math.random() - 0.5) * 8;
             this.life = 1.0;
         }
-
         update() {
-            this.x += this.vx;
-            this.y += this.vy;
-            this.life -= 0.02;
+            this.x += this.vx; this.y += this.vy;
+            this.life -= 0.03;
         }
-
         draw() {
             ctx.globalAlpha = this.life;
             ctx.fillStyle = this.color;
@@ -161,126 +160,106 @@
         }
     }
 
-    function spawnFruit() {
-        const isBomb = Math.random() < 0.15; // 15% 概率生成炸弹
-        fruits.push(new GameObject(isBomb));
-    }
-
-    function createExplosion(x, y, color) {
-        for (let i = 0; i < 15; i++) {
-            particles.push(new Particle(x, y, color));
-        }
-    }
-
     function checkCollision() {
-    if (blade.length < 2) return;
-
-    for (let i = fruits.length - 1; i >= 0; i--) {
-        const f = fruits[i];
-        if (f.isSliced) continue;
-
+        if (blade.length < 2) return;
         const p1 = blade[blade.length - 2];
         const p2 = blade[blade.length - 1];
 
-        // --- 修复逻辑：线段最近点判定 ---
-        const dx = p2.x - p1.x;
-        const dy = p2.y - p1.y;
-        const l2 = dx * dx + dy * dy;
-        if (l2 === 0) continue;
+        for (let i = fruits.length - 1; i >= 0; i--) {
+            const f = fruits[i];
+            if (f.isSliced) continue;
 
-        // 计算投影比例 t
-        let t = ((f.x - p1.x) * dx + (f.y - p1.y) * dy) / l2;
-        // 限制 t 在 [0, 1] 之间，确保只在这一段指尖轨迹内判定
-        t = Math.max(0, Math.min(1, t));
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const l2 = dx * dx + dy * dy;
+            if (l2 === 0) continue;
+            let t = ((f.x - p1.x) * dx + (f.y - p1.y) * dy) / l2;
+            t = Math.max(0, Math.min(1, t));
+            const dist = Math.hypot(f.x - (p1.x + t * dx), f.y - (p1.y + t * dy));
 
-        const closestX = p1.x + t * dx;
-        const closestY = p1.y + t * dy;
-
-        const distX = f.x - closestX;
-        const distY = f.y - closestY;
-        const distance = Math.sqrt(distX * distX + distY * distY);
-
-        // 适当调小判定半径（例如乘以 0.8），让玩家感觉必须“切中中心”
-        if (distance < f.radius * 0.8) {
-            if (f.isBomb) {
-                endGame();
-            } else {
-                f.isSliced = true;
-                score += 10;
-                scoreEl.innerText = score;
-                createExplosion(f.x, f.y, f.color);
-                fruits.splice(i, 1);
+            // 碰撞判定半径（慢速版更宽松一点）
+            if (dist < f.radius * 0.9) {
+                if (f.isBomb) {
+                    overStatusEl.innerText = "哎呀！切到炸弹了";
+                    endGame();
+                } else {
+                    f.isSliced = true;
+                    score += 10;
+                    updateUI();
+                    for(let j=0; j<10; j++) particles.push(new Particle(f.x, f.y, f.color));
+                    fruits.splice(i, 1);
+                }
             }
         }
     }
-}
 
     function endGame() {
         gameActive = false;
+        finalScoreEl.innerText = score;
         gameOverEl.style.display = 'block';
     }
 
     function animate(time) {
-        if (!gameActive) return requestAnimationFrame(animate);
-
         ctx.clearRect(0, 0, width, height);
 
-        // 生成物体
-        if (time - lastSpawnTime > CONFIG.spawnInterval) {
-            spawnFruit();
-            lastSpawnTime = time;
+        if (gameActive) {
+            if (time - lastSpawnTime > CONFIG.spawnInterval) {
+                fruits.push(new GameObject(Math.random() < 0.15));
+                lastSpawnTime = time;
+            }
         }
 
-        // 更新并绘制水果
         for (let i = fruits.length - 1; i >= 0; i--) {
             fruits[i].update();
             fruits[i].draw();
-            // 掉出屏幕移除
-            if (fruits[i].y > height + 100) fruits.splice(i, 1);
+
+            if (fruits[i].y > height + 50) {
+                if (!fruits[i].isBomb && !fruits[i].isSliced) {
+                    lives--;
+                    updateUI();
+                    if (lives <= 0) {
+                        overStatusEl.innerText = "漏掉太多水果啦！";
+                        endGame();
+                    }
+                }
+                fruits.splice(i, 1);
+            }
         }
 
-        // 更新并绘制粒子
         for (let i = particles.length - 1; i >= 0; i--) {
             particles[i].update();
             particles[i].draw();
             if (particles[i].life <= 0) particles.splice(i, 1);
         }
 
-        // 绘制刀锋轨迹
         if (blade.length > 1) {
             ctx.beginPath();
             ctx.strokeStyle = '#fff';
             ctx.lineWidth = 5;
-            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
             ctx.moveTo(blade[0].x, blade[0].y);
-            for (let i = 1; i < blade.length; i++) {
-                ctx.lineTo(blade[i].x, blade[i].y);
-            }
+            for (let i = 1; i < blade.length; i++) ctx.lineTo(blade[i].x, blade[i].y);
             ctx.stroke();
             checkCollision();
-            // 轨迹淡出
             blade.shift(); 
         }
 
         requestAnimationFrame(animate);
     }
 
-    // 事件监听
     window.addEventListener('resize', resize);
-
-    canvas.addEventListener('pointermove', (e) => {
+    const handleInput = (e) => {
         if (!gameActive) return;
-        blade.push({ x: e.clientX, y: e.clientY });
-        if (blade.length > 10) blade.shift();
-    });
+        const x = e.touches ? e.touches[0].clientX : e.clientX;
+        const y = e.touches ? e.touches[0].clientY : e.clientY;
+        blade.push({ x, y });
+        if (blade.length > 8) blade.shift();
+    };
 
-    canvas.addEventListener('pointerdown', (e) => {
-        blade = [{ x: e.clientX, y: e.clientY }];
-    });
-
-    canvas.addEventListener('pointerup', () => {
-        blade = [];
-    });
+    canvas.addEventListener('mousemove', handleInput);
+    canvas.addEventListener('touchmove', (e) => { e.preventDefault(); handleInput(e); }, { passive: false });
+    canvas.addEventListener('mousedown', () => blade = []);
+    canvas.addEventListener('touchstart', () => blade = []);
 
     init();
 </script>
