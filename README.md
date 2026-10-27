@@ -38,7 +38,6 @@ Snake -> https://growingrui.github.io/brainstorming/snake
 
 DouDiZhu(斗地主) -> https://growingrui.github.io/brainstorming/DouDiZhu
 
-Restaurant  https://growingrui.github.io/brainstorming/rest
 
 
 
